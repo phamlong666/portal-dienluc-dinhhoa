@@ -1,3 +1,4 @@
+import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -9,9 +10,9 @@ def ve_bieu_do_ton_that(counts_thuchien, counts_cungkỳ=None):
         counts_cungkỳ = [0] * len(labels)
 
     fig, (ax_bar, ax_pie) = plt.subplots(1, 2, figsize=(14, 6), width_ratios=[2, 1])
-
     x = np.arange(len(labels))
     width = 0.35
+
     bars1 = ax_bar.bar(x - width / 2, counts_thuchien, width=width, color=colors_bar, label="Thực hiện")
     bars2 = ax_bar.bar(x + width / 2, counts_cungkỳ, width=width, color="#d3d3d3", label="Cùng kỳ")
 
@@ -44,11 +45,14 @@ def ve_bieu_do_ton_that(counts_thuchien, counts_cungkỳ=None):
     ax_pie.text(0, 0, f"Tổng số TBA\n{total}", ha='center', va='center', fontsize=11, fontweight='bold')
     ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=11, fontweight='bold')
 
-    plt.tight_layout()
-    plt.show()
+    return fig
 
-# Demo chạy thử
-if __name__ == "__main__":
-    counts_thuchien = [12, 12, 29, 42, 76, 32]
-    counts_cungkỳ = [0, 0, 0, 0, 0, 0]
-    ve_bieu_do_ton_that(counts_thuchien, counts_cungkỳ)
+# Giao diện Streamlit
+st.set_page_config(layout="wide", page_title="Biểu đồ TBA theo ngưỡng tổn thất")
+st.title("\U0001F4CA Biểu đồ tổn thất TBA")
+
+counts_thuchien = [12, 12, 29, 42, 76, 32]
+counts_cungkỳ = [0, 0, 0, 0, 0, 0]
+
+fig = ve_bieu_do_ton_that(counts_thuchien, counts_cungkỳ)
+st.pyplot(fig)
