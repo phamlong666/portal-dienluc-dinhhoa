@@ -115,7 +115,7 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     # BIỂU ĐỒ DONUT
     st.markdown("### 🎯 Tỷ trọng TBA theo ngưỡng tổn thất")
     pie_data = df["Ngưỡng tổn thất"].value_counts().reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"], fill_value=0)
-    fig2, ax2 = plt.subplots(figsize=(3, 3))
+    fig2, ax2 = plt.subplots(figsize=(1, 1))  # Đã sửa theo yêu cầu giảm 4 lần
     wedges, _, autotexts = ax2.pie(
         pie_data,
         labels=None,
