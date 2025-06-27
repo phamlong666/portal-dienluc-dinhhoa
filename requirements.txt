@@ -2,6 +2,7 @@ streamlit
 pandas
 Pillow
 matplotlib
+seaborn
 python-docx
 python-pptx
 fpdf
