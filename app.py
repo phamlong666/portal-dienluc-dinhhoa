@@ -80,23 +80,32 @@ if "cùng kỳ" in mode.lower() and nam_cungkỳ:
     df_ck = load_data(files_ck, all_files, "Cùng kỳ")
     df = pd.concat([df, df_ck])
 
-# ============ TIỀN XỬ LÝ ===========
+# ============ TIỀN XỬ LÝ ==========
 if not df.empty and all(col in df.columns for col in ["Tổn thất (KWh)", "ĐN nhận đầu nguồn"]):
     df = df.copy()
+    # Tỷ lệ tổn thất lấy trực tiếp từ file Excel, không tính lại
+    # Định dạng số liệu cột điện nhận, điện thương phẩm, tổn thất
     for col in ["ĐN nhận đầu nguồn", "Điện thương phẩm", "Tổn thất (KWh)"]:
         if col in df.columns:
             df[col] = df[col].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+
     for col in ["Tỷ lệ tổn thất", "So sánh"]:
         if col in df.columns:
             df[col] = df[col].apply(lambda x: round(x, 2))
+
     if "Ngưỡng tổn thất" in df.columns and nguong != "(All)":
         df = df[df["Ngưỡng tổn thất"] == nguong]
 
-# ============ HIỂN THỊ ============
+    for col in ["ĐN nhận đầu nguồn", "Điện thương phẩm", "Tổn thất (KWh)"]:
+        if col in df.columns:
+            df[col] = df[col].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+
+# ============ HIỂN THỊ ==========
 st.markdown("---")
 if not df.empty:
     st.dataframe(df, use_container_width=True)
 
+    # Phân loại ngưỡng tổn thất
     def classify_nguong(x):
         if x < 2: return "<2%"
         elif 2 <= x < 3: return ">=2 và <3%"
@@ -107,6 +116,9 @@ if not df.empty:
 
     if "Tỷ lệ tổn thất" in df.columns:
         df["Ngưỡng tổn thất"] = df["Tỷ lệ tổn thất"].apply(classify_nguong)
+
+    import matplotlib.pyplot as plt
+    import numpy as np
 
     labels = ["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"]
     colors_bar = ["#2f69bf", "#f28e2b", "#bab0ac", "#59a14f", "#e6b000", "#d62728"]
@@ -120,21 +132,25 @@ if not df.empty:
         counts_cungkỳ = pd.Series([0]*6, index=labels)
 
     fig, (ax_bar, ax_pie) = plt.subplots(1, 2, figsize=(12, 5), width_ratios=[2, 1])
+
     x = np.arange(len(labels))
     width = 0.35
     bars1 = ax_bar.bar(x - width/2, counts_thuchien, width=width, color=colors_bar, label="Thực hiện")
     bars2 = ax_bar.bar(x + width/2, counts_cungkỳ, width=width, color="#d3d3d3", label="Cùng kỳ")
+
     for bars in [bars1, bars2]:
         for bar in bars:
             height = bar.get_height()
             ax_bar.text(bar.get_x() + bar.get_width()/2, height + 1, str(int(height)),
                         ha='center', va='bottom', fontsize=9, fontweight='bold', color='black')
+
     ax_bar.set_xticks(x)
     ax_bar.set_xticklabels(labels, fontsize=10, fontweight='bold')
     ax_bar.set_ylabel("Số lượng", fontsize=11)
     ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=12, fontweight='bold')
     ax_bar.legend(fontsize=9)
 
+    # Donut chart
     total = sum(counts_thuchien)
     wedges, texts, autotexts = ax_pie.pie(
         counts_thuchien,
@@ -153,5 +169,50 @@ if not df.empty:
 
     plt.tight_layout()
     st.pyplot(fig)
+
+
+    # Biểu đồ cột theo kỳ và ngưỡng tổn thất
+    if "Ngưỡng tổn thất" in df.columns and "Kỳ" in df.columns:
+        count_df = df.groupby(["Ngưỡng tổn thất", "Kỳ"]).size().unstack(fill_value=0).reset_index()
+        fig, ax = plt.subplots(figsize=(10, 5))
+        width = 0.35
+        x = range(len(count_df))
+        cols = list(count_df.columns)
+        cols.remove("Ngưỡng tổn thất")
+        for i, col in enumerate(cols):
+            offset = (i - (len(cols) - 1)/2) * width
+            bars = ax.bar([xi + offset for xi in x], count_df[col], width, label=col, color=("teal" if "Thực" in col else "lightgray"))
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', fontsize=9, fontweight='bold', color='black')
+        ax.set_xticks(x)
+        ax.set_xticklabels(count_df["Ngưỡng tổn thất"], fontsize=10, fontweight='bold')
+        ax.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=14, fontweight="bold")
+        ax.set_ylabel("Số lượng")
+        ax.legend()
+        st.pyplot(fig)
+
+        # Biểu đồ donut tỷ trọng TBA theo ngưỡng
+        count_pie = df["Ngưỡng tổn thất"].value_counts().reindex([
+            "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"
+        ], fill_value=0)
+        fig2, ax2 = plt.subplots(figsize=(5, 5))
+        colors_pie = ["#2f69bf", "#f28e2b", "#bab0ac", "#59a14f", "#e6b000", "#d62728"]
+        wedges, texts, autotexts = ax2.pie(
+            count_pie,
+            labels=None,
+            autopct=lambda p: f'{p:.2f}%' if p > 0 else '',
+            startangle=90,
+            colors=colors_pie,
+            wedgeprops={'width': 0.3}
+        )
+        for autotext in autotexts:
+            autotext.set_fontweight('bold')
+            autotext.set_color('black')
+            autotext.set_fontsize(10)
+        ax2.text(0, 0, f"Tổng số TBA\n{count_pie.sum()}", ha='center', va='center', fontsize=12, fontweight='bold')
+        st.pyplot(fig2)
+
+
 else:
     st.warning("Không có dữ liệu phù hợp hoặc thiếu file Excel trong thư mục Drive.")
