@@ -115,4 +115,25 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     # BIỂU ĐỒ DONUT
     st.markdown("### 🎯 Tỷ trọng TBA theo ngưỡng tổn thất")
     pie_data = df["Ngưỡng tổn thất"].value_counts().reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"], fill_value=0)
-    fig2, ax2 = plt.subplots(figsize=(2, 2))  # Giảm kích thước xuống theo yêu cầu anh Long
+    fig2, ax2 = plt.subplots(figsize=(3, 3))
+    wedges, _, autotexts = ax2.pie(
+        pie_data,
+        labels=None,
+        autopct=lambda p: f'{p:.2f}%' if p > 0 else '',
+        startangle=90,
+        colors=["#1f77b4", "#ff7f0e", "#c7c7c7", "#bcbd22", "#2ca02c", "#d62728"],
+        wedgeprops={'width': 0.35}
+    )
+    for autotext in autotexts:
+        autotext.set_fontsize(8)
+        autotext.set_fontweight("bold")
+    ax2.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=10, fontweight='bold')
+    ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=10)
+    st.pyplot(fig2)
+
+    # HIỂN THỊ DỮ LIỆU CHI TIẾT
+    st.markdown("### 📋 Danh sách chi tiết TBA")
+    st.dataframe(df.reset_index(drop=True), use_container_width=True)
+
+else:
+    st.warning("Không có dữ liệu phù hợp để hiển thị biểu đồ.")
