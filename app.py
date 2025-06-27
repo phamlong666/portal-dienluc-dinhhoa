@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 from datetime import datetime
 import io
 from google.oauth2 import service_account
@@ -69,7 +70,6 @@ def load_data(file_list, all_files, nhan="Thực hiện"):
                 dfs.append(df)
     return pd.concat(dfs) if dfs else pd.DataFrame()
 
-# ============ PHÂN TÍCH ============
 all_files = list_excel_files()
 
 files = generate_filenames(nam, thang_from, thang_to if "Lũy kế" in mode else thang_from)
@@ -81,9 +81,24 @@ if "cùng kỳ" in mode.lower() and nam_cungkỳ:
 
 if not df.empty and all(col in df.columns for col in ["Tổn thất (KWh)", "ĐN nhận đầu nguồn"]):
     df = df.copy()
+    for col in ["ĐN nhận đầu nguồn", "Điện thương phẩm", "Tổn thất (KWh)"]:
+        if col in df.columns:
+            df[col] = df[col].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+
     for col in ["Tỷ lệ tổn thất", "So sánh"]:
         if col in df.columns:
             df[col] = df[col].apply(lambda x: round(x, 2))
+
+    if "Ngưỡng tổn thất" in df.columns and nguong != "(All)":
+        df = df[df["Ngưỡng tổn thất"] == nguong]
+
+    for col in ["ĐN nhận đầu nguồn", "Điện thương phẩm", "Tổn thất (KWh)"]:
+        if col in df.columns:
+            df[col] = df[col].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+
+st.markdown("---")
+if not df.empty:
+    st.dataframe(df, use_container_width=True)
 
     def classify_nguong(x):
         if x < 2: return "<2%"
@@ -96,57 +111,67 @@ if not df.empty and all(col in df.columns for col in ["Tổn thất (KWh)", "ĐN
     if "Tỷ lệ tổn thất" in df.columns:
         df["Ngưỡng tổn thất"] = df["Tỷ lệ tổn thất"].apply(classify_nguong)
 
-    if nguong != "(All)":
-        df = df[df["Ngưỡng tổn thất"] == nguong]
+    st.subheader(f"🔍 Biểu đồ tổn thất - Tháng {thang_from} / {nam}")
+    display_options = st.multiselect(
+        "Chọn biểu đồ muốn hiển thị",
+        ["Biểu đồ cột", "Biểu đồ donut"],
+        default=["Biểu đồ cột", "Biểu đồ donut"]
+    )
 
-    st.markdown("---")
-    col1, col2 = st.columns([2, 1])
+    colors_dict = {
+        "<2%": "#1f77b4",          # Xanh biển
+        ">=2 và <3%": "#ff7f0e",   # Cam
+        ">=3 và <4%": "#c7c7c7",   # Xám
+        ">=4 và <5%": "#bcbd22",   # Vàng đất
+        ">=5 và <7%": "#2ca02c",   # Xanh lá
+        ">=7%": "#d62728"           # Đỏ
+    }
 
-    with col1:
+    if "Biểu đồ cột" in display_options and "Ngưỡng tổn thất" in df.columns and "Kỳ" in df.columns:
         count_df = df.groupby(["Ngưỡng tổn thất", "Kỳ"]).size().unstack(fill_value=0).reset_index()
-        fig, ax = plt.subplots(figsize=(6, 3.2))
+        order = list(colors_dict.keys())
+        count_df["Ngưỡng tổn thất"] = pd.Categorical(count_df["Ngưỡng tổn thất"], categories=order, ordered=True)
+        count_df.sort_values("Ngưỡng tổn thất", inplace=True)
+
+        fig, ax = plt.subplots(figsize=(10, 4))
         width = 0.35
         x = range(len(count_df))
-        cols = list(count_df.columns)
-        cols.remove("Ngưỡng tổn thất")
-        palette = sns.color_palette("Set2", len(cols))
-        for i, col in enumerate(cols):
-            offset = (i - (len(cols) - 1)/2) * width
-            bars = ax.bar([xi + offset for xi in x], count_df[col], width, label=col, color=palette[i])
+        for i, col in [ (i, c) for i, c in enumerate(count_df.columns) if c != "Ngưỡng tổn thất"]:
+            offset = (i - (len(count_df.columns)-2)/2) * width
+            bars = ax.bar([xi + offset for xi in x], count_df[col], width, label=col,
+                          color=[colors_dict[nguong] for nguong in count_df["Ngưỡng tổn thất"]])
             for bar in bars:
                 height = bar.get_height()
-                if height > 0:
-                    ax.text(bar.get_x() + bar.get_width()/2, height + 1, f'{int(height)}', ha='center', fontsize=8)
-        ax.set_xticks(x)
+                ax.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}',
+                        ha='center', fontsize=8, color='black', fontweight='bold')
+
+        ax.set_xticks(list(x))
         ax.set_xticklabels(count_df["Ngưỡng tổn thất"], fontsize=9)
-        ax.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=11)
         ax.set_ylabel("Số lượng", fontsize=9)
+        ax.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=11, weight='bold')
         ax.legend(fontsize=8)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+        ax.grid(axis='y', linestyle='--', linewidth=0.5)
         st.pyplot(fig)
 
-    with col2:
-        count_pie = df["Ngưỡng tổn thất"].value_counts().reindex([
-            "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"
-        ], fill_value=0)
-        fig2, ax2 = plt.subplots(figsize=(3.2, 3.2))
-        colors_pie = sns.color_palette("Set2", len(count_pie))
+    if "Biểu đồ donut" in display_options and "Ngưỡng tổn thất" in df.columns:
+        count_pie = df["Ngưỡng tổn thất"].value_counts().reindex(list(colors_dict.keys()), fill_value=0)
+        fig2, ax2 = plt.subplots(figsize=(4.5, 4.5))
         wedges, texts, autotexts = ax2.pie(
             count_pie,
             labels=None,
-            autopct=lambda p: f'{p:.1f}%' if p > 0 else '',
+            autopct=lambda p: f'{p:.2f}%' if p > 0 else '',
             startangle=90,
-            colors=colors_pie,
+            colors=[colors_dict[k] for k in count_pie.index],
             wedgeprops={'width': 0.35}
         )
         for autotext in autotexts:
-            autotext.set_fontsize(7)
-        ax2.text(0, 0, f"Tổng số TBA\n{count_pie.sum()}", ha='center', va='center', fontsize=9, fontweight='bold')
-        ax2.set_title("Tỷ trọng theo ngưỡng", fontsize=10)
-        st.pyplot(fig2)
+            autotext.set_fontweight('bold')
+            autotext.set_color('black')
+            autotext.set_fontsize(8)
 
-    st.markdown("---")
-    st.dataframe(df, use_container_width=True)
+        ax2.text(0, 0, f"Tổng số TBA\n{count_pie.sum()}",
+                 ha='center', va='center', fontsize=10, fontweight='bold')
+        ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=10, weight='bold')
+        st.pyplot(fig2)
 else:
     st.warning("Không có dữ liệu phù hợp hoặc thiếu file Excel trong thư mục Drive.")
