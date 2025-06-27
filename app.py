@@ -7,6 +7,7 @@ import io
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
+import seaborn as sns
 
 st.set_page_config(layout="wide", page_title="Phân tích tổn thất TBA công cộng")
 st.title("📊 Phân tích tổn thất các TBA công cộng")
@@ -122,43 +123,46 @@ if not df.empty:
 
     if "Biểu đồ cột" in display_options and "Ngưỡng tổn thất" in df.columns and "Kỳ" in df.columns:
         count_df = df.groupby(["Ngưỡng tổn thất", "Kỳ"]).size().unstack(fill_value=0).reset_index()
-        fig, ax = plt.subplots(figsize=(10, 5))
+        fig, ax = plt.subplots(figsize=(8, 4))
         width = 0.35
         x = range(len(count_df))
         cols = list(count_df.columns)
         cols.remove("Ngưỡng tổn thất")
+        palette = sns.color_palette("Set2", len(cols))
         for i, col in enumerate(cols):
             offset = (i - (len(cols) - 1)/2) * width
-            bars = ax.bar([xi + offset for xi in x], count_df[col], width, label=col, color=("teal" if "Thực" in col else "lightgray"))
+            bars = ax.bar([xi + offset for xi in x], count_df[col], width, label=col, color=palette[i])
             for bar in bars:
                 height = bar.get_height()
-                ax.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', fontsize=9, fontweight='bold', color='black')
+                ax.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', fontsize=8, color='black')
         ax.set_xticks(x)
-        ax.set_xticklabels(count_df["Ngưỡng tổn thất"], fontsize=10, fontweight='bold')
-        ax.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=14, fontweight="bold")
-        ax.set_ylabel("Số lượng")
-        ax.legend()
+        ax.set_xticklabels(count_df["Ngưỡng tổn thất"], fontsize=9)
+        ax.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=11)
+        ax.set_ylabel("Số lượng", fontsize=9)
+        ax.legend(fontsize=8)
+        ax.grid(axis='y', linestyle='--', linewidth=0.5)
         st.pyplot(fig)
 
     if "Biểu đồ donut" in display_options and "Ngưỡng tổn thất" in df.columns:
         count_pie = df["Ngưỡng tổn thất"].value_counts().reindex([
             "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"
         ], fill_value=0)
-        fig2, ax2 = plt.subplots(figsize=(5, 5))
-        colors_pie = ["#2f69bf", "#f28e2b", "#bab0ac", "#59a14f", "#e6b000", "#d62728"]
+        fig2, ax2 = plt.subplots(figsize=(4, 4))
+        colors_pie = sns.color_palette("Set2", len(count_pie))
         wedges, texts, autotexts = ax2.pie(
             count_pie,
             labels=None,
             autopct=lambda p: f'{p:.2f}%' if p > 0 else '',
             startangle=90,
             colors=colors_pie,
-            wedgeprops={'width': 0.3}
+            wedgeprops={'width': 0.35}
         )
         for autotext in autotexts:
             autotext.set_fontweight('bold')
             autotext.set_color('black')
-            autotext.set_fontsize(10)
-        ax2.text(0, 0, f"Tổng số TBA\n{count_pie.sum()}", ha='center', va='center', fontsize=12, fontweight='bold')
+            autotext.set_fontsize(8)
+        ax2.text(0, 0, f"Tổng số TBA\n{count_pie.sum()}", ha='center', va='center', fontsize=10, fontweight='bold')
+        ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=10)
         st.pyplot(fig2)
 
 else:
