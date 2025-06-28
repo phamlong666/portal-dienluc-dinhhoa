@@ -96,7 +96,7 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     pivot_df = pivot_df.reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
     pivot_df = pivot_df.loc[~pivot_df.index.isnull()]
 
-    fig, ax = plt.subplots(figsize=(4, 2))  # Giảm 50% khung biểu đồ cột
+    fig, ax = plt.subplots(figsize=(2, 1))
     width = 0.35
     x = range(len(pivot_df))
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
@@ -105,17 +105,17 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         bars = ax.bar([xi + offset for xi in x], pivot_df[col], width, label=col, color=colors[i % len(colors)])
         for bar in bars:
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2, height + 1, f'{int(height)}', ha='center', fontsize=6, color='black')
+            ax.text(bar.get_x() + bar.get_width()/2, height + 1, f'{int(height)}', ha='center', fontsize=3, color='black')
 
     ax.set_xticks(list(x))
-    ax.set_xticklabels(pivot_df.index, fontsize=7)
-    ax.set_ylabel("Số lượng", fontsize=7)
-    ax.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=8, weight='bold')
-    ax.legend(title="Kỳ", fontsize=6)
+    ax.set_xticklabels(pivot_df.index, fontsize=3)
+    ax.set_ylabel("Số lượng", fontsize=3)
+    ax.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=3, weight='bold')
+    ax.legend(title="Kỳ", fontsize=3)
     ax.grid(axis='y', linestyle='--', linewidth=0.5)
+    fig.dpi = 300
     st.pyplot(fig)
 
-    # BIỂU ĐỒ DONUT
     st.markdown("### 🎯 Tỷ trọng TBA theo ngưỡng tổn thất")
 
     df_latest = df_unique[df_unique['Kỳ'] == 'Thực hiện']
@@ -124,7 +124,7 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         fill_value=0
     )
 
-    fig2, ax2 = plt.subplots(figsize=(1.25, 1.25))  # Giảm 50% khung biểu đồ donut
+    fig2, ax2 = plt.subplots(figsize=(0.6, 0.6))
     wedges, _, autotexts = ax2.pie(
         pie_data,
         labels=None,
@@ -134,10 +134,11 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         wedgeprops={'width': 0.35}
     )
     for autotext in autotexts:
-        autotext.set_fontsize(5)
+        autotext.set_fontsize(1.5)
         autotext.set_fontweight("bold")
-    ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=5)
-    ax2.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=5, fontweight='bold')
+    ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=1.5)
+    ax2.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=1.5, fontweight='bold')
+    fig2.dpi = 300
     st.pyplot(fig2)
 
     nguong_options = ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"]
