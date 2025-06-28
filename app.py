@@ -20,8 +20,6 @@ with col3:
     nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0)
     nam_cungkỳ = nam - 1 if "cùng kỳ" in mode.lower() else None
 
-nguong = st.selectbox("Ngưỡng tổn thất", ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
-
 FOLDER_ID = '165Txi8IyqG50uFSFHzWidSZSG9qpsbaq'
 
 @st.cache_data
@@ -93,49 +91,45 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
 
     count_df = df_unique.groupby(["Ngưỡng tổn thất", "Kỳ"]).size().reset_index(name="Số lượng")
     pivot_df = count_df.pivot(index="Ngưỡng tổn thất", columns="Kỳ", values="Số lượng").fillna(0).astype(int)
-    pivot_df = pivot_df.reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
 
-    fig, ax = plt.subplots(figsize=(8, 4), dpi=300)
-    width = 0.35
+    fig_bar, ax_bar = plt.subplots(figsize=(8, 4), dpi=300)
     x = range(len(pivot_df))
+    width = 0.35
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
     for i, col in enumerate(pivot_df.columns):
         offset = (i - (len(pivot_df.columns)-1)/2) * width
-        bars = ax.bar([xi + offset for xi in x], pivot_df[col], width, label=col, color=colors[i % len(colors)])
-        for bar in bars:
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2, height + 1, f'{int(height)}', ha='center', fontsize=6, color='black')
+        ax_bar.bar([xi + offset for xi in x], pivot_df[col], width, label=col, color=colors[i % len(colors)])
 
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(pivot_df.index, fontsize=6)
-    ax.set_ylabel("Số lượng", fontsize=6)
-    ax.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=7, weight='bold')
-    ax.legend(title="Kỳ", fontsize=5)
-    ax.grid(axis='y', linestyle='--', linewidth=0.5)
-    st.pyplot(fig)
+    ax_bar.set_ylabel("Số lượng", fontsize=7)
+    ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=9, weight='bold')
+    ax_bar.set_xticks(list(x))
+    ax_bar.set_xticklabels(pivot_df.index, fontsize=7)
+    ax_bar.legend(title="Kỳ", fontsize=6)
+    ax_bar.grid(axis='y', linestyle='--', linewidth=0.5)
+    st.pyplot(fig_bar)
 
     st.markdown("### 🎯 Tỷ trọng TBA theo ngưỡng tổn thất")
 
     df_latest = df_unique[df_unique['Kỳ'] == 'Thực hiện']
-    pie_data = df_latest["Ngưỡng tổn thất"].value_counts().reindex(
-        ["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"],
-        fill_value=0
+    pie_data = df_latest["Ngưỡng tổn thất"].value_counts().reindex(pivot_df.index, fill_value=0)
+
+    fig2, ax2 = plt.subplots(figsize=(4, 4), dpi=300)
+    wedges, texts, autotexts = ax2.pie(
+        pie_data,
+        labels=pivot_df.index,
+        autopct='%1.1f%%',
+        startangle=90,
+        colors=colors,
+        pctdistance=0.75,
+        wedgeprops={'width': 0.3, 'edgecolor': 'w'}
     )
 
-    fig2, ax2 = plt.subplots(figsize=(2, 2), dpi=300)
-    wedges, _, autotexts = ax2.pie(
-        pie_data,
-        labels=None,
-        autopct=lambda p: f'{p:.1f}%' if p > 0 else '',
-        startangle=90,
-        colors=["#1f77b4", "#ff7f0e", "#c7c7c7", "#bcbd22", "#2ca02c", "#d62728"],
-        wedgeprops={'width': 0.35}
-    )
     for autotext in autotexts:
+        autotext.set_color('black')
         autotext.set_fontsize(6)
-        autotext.set_fontweight("bold")
-    ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=7)
-    ax2.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=6, fontweight='bold')
+
+    ax2.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=7, fontweight='bold', color='black')
+    ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=9, weight='bold')
     st.pyplot(fig2)
 
     nguong_options = ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"]
