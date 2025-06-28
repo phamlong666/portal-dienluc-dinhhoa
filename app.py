@@ -118,7 +118,7 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         ["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"],
         fill_value=0
     )
-    fig2, ax2 = plt.subplots(figsize=(2.5, 2.5))
+    fig2, ax2 = plt.subplots(figsize=(2.2, 2.2))
     wedges, _, autotexts = ax2.pie(
         pie_data,
         labels=None,
@@ -128,7 +128,7 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         wedgeprops={'width': 0.35}
     )
     for autotext in autotexts:
-        autotext.set_fontsize(4)  # Giảm nhỏ hơn 50%
+        autotext.set_fontsize(3)  # Giảm nhỏ hơn 50%
         autotext.set_fontweight("bold")
     ax2.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=10, fontweight='bold')
     ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=10)
