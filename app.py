@@ -1,19 +1,19 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
-import io
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
 
 st.set_page_config(layout="wide", page_title="Phân tích tổn thất TBA công cộng")
 st.title("📊 Phân tích tổn thất các TBA công cộng")
 
-# ... Các phần đọc file và xử lý dữ liệu giữ nguyên như trước ...
+# Dummy dataframe tạm để tránh lỗi (anh thay bằng dữ liệu thực tế sau)
+data = {
+    "Tên TBA": ["TBA 1", "TBA 2", "TBA 3", "TBA 4", "TBA 5", "TBA 6"],
+    "Kỳ": ["Thực hiện", "Thực hiện", "Cùng kỳ", "Cùng kỳ", "Thực hiện", "Cùng kỳ"],
+    "Tỷ lệ tổn thất": [1.5, 2.8, 3.5, 4.2, 5.1, 6.3]
+}
+df = pd.DataFrame(data)
 
 if not df.empty and "Tỷ lệ tổn thất" in df.columns:
-    # Phân loại ngưỡng
     def classify_nguong(x):
         if x < 2: return "<2%"
         elif 2 <= x < 3: return ">=2 và <3%"
@@ -32,7 +32,6 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
 
     fig, (ax_bar, ax_pie) = plt.subplots(1, 2, figsize=(12, 5), dpi=300)
 
-    # Vẽ biểu đồ cột
     x = range(len(pivot_df))
     width = 0.35
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
@@ -47,7 +46,6 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     ax_bar.legend(title="Kỳ", fontsize=6)
     ax_bar.grid(axis='y', linestyle='--', linewidth=0.5)
 
-    # Vẽ biểu đồ donut
     wedges, texts, autotexts = ax_pie.pie(
         pie_data,
         labels=pivot_df.index,
@@ -57,6 +55,7 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         pctdistance=0.75,
         wedgeprops={'width': 0.3, 'edgecolor': 'w'}
     )
+
     for autotext in autotexts:
         autotext.set_color('black')
         autotext.set_fontsize(6)
@@ -66,7 +65,6 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
 
     st.pyplot(fig)
 
-    # Lọc và hiển thị bảng
     nguong_options = ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"]
     nguong_filter = st.selectbox("Chọn ngưỡng để lọc danh sách TBA", nguong_options)
     if nguong_filter != "(All)":
