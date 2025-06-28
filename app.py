@@ -22,7 +22,7 @@ with col3:
 
 nguong = st.selectbox("Ngưỡng tổn thất", ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
 
-# Dummy dữ liệu để demo
+# Dummy dữ liệu demo
 data = {
     "Tên TBA": ["TBA 1", "TBA 2", "TBA 3", "TBA 4", "TBA 5", "TBA 6"],
     "Kỳ": ["Thực hiện", "Thực hiện", "Cùng kỳ", "Cùng kỳ", "Thực hiện", "Cùng kỳ"],
@@ -55,7 +55,8 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         bars = ax_bar.bar([xi + offset for xi in x], pivot_df[col], width, label=col, color=colors[i % len(colors)])
         for bar in bars:
             height = bar.get_height()
-            ax_bar.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', va='bottom', fontsize=5, fontweight='bold', color='black')
+            if height > 0:
+                ax_bar.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', va='bottom', fontsize=5, fontweight='bold', color='black')
 
     ax_bar.set_ylabel("Số lượng", fontsize=3)
     ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=4, weight='bold')
@@ -79,14 +80,14 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     )
 
     for text in texts:
-        text.set_fontsize(2)
+        text.set_fontsize(3)
         text.set_fontweight('bold')
     for autotext in autotexts:
         autotext.set_color('black')
-        autotext.set_fontsize(2)
+        autotext.set_fontsize(3)
         autotext.set_fontweight('bold')
 
-    ax_pie.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=3, fontweight='bold', color='black')
+    ax_pie.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=4, fontweight='bold', color='black')
     ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=4, weight='bold')
 
     st.pyplot(fig)
