@@ -1,12 +1,12 @@
 import streamlit as st
 import pandas as pd
 import os
-import matplotlib.pyplot as plt # Thêm mới từ app moi.py
-from datetime import datetime # Đã có, nhưng đảm bảo có
-import io # Thêm mới từ app moi.py
-from google.oauth2 import service_account # Thêm mới từ app moi.py
-from googleapiclient.discovery import build # Thêm mới từ app moi.py
-from googleapiclient.http import MediaIoBaseDownload # Thêm mới từ app moi.py
+import matplotlib.pyplot as plt
+from datetime import datetime
+import io
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
 st.set_page_config(layout="wide", page_title="Báo cáo tổn thất TBA")
 st.title("📥 AI_Trợ lý tổn thất")
@@ -48,18 +48,6 @@ FOLDER_ID = '165Txi8IyqG50uFSFHzWidSZSG9qpsbaq' # ID thư mục Google Drive ch�
 @st.cache_data
 def get_drive_service():
     """Khởi tạo và trả về đối tượng dịch vụ Google Drive."""
-    # st.secrets["google"] phải được cấu hình trong .streamlit/secrets.toml
-    # [google]
-    # type = "service_account"
-    # project_id = "your-gcp-project-id"
-    # private_key_id = "your-private-key-id"
-    # private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-    # client_email = "your-service-account-email@your-project-id.iam.gserviceaccount.com"
-    # client_id = "your-client-id"
-    # auth_uri = "https://accounts.google.com/o/oauth2/auth"
-    # token_uri = "https://oauth2.googleapis.com/token"
-    # auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
-    # client_x509_cert_url = "your-client-x509-cert-url"
     try:
         credentials = service_account.Credentials.from_service_account_info(
             st.secrets["google"],
@@ -137,40 +125,6 @@ def classify_nguong(x):
     elif 5 <= x < 7: return ">=5 và <7%"
     else: return ">=7%"
 
-
-# --- Các nút chính: Làm mới dữ liệu và Tải file mẫu ---
-col_refresh, col_download_folder = st.columns([1, 1])
-
-with col_refresh:
-    if st.button("🔄 Làm mới dữ liệu"):
-        # Xóa cache của Streamlit để tải lại dữ liệu từ Drive
-        st.cache_data.clear()
-        # Reset các biến session_state liên quan đến df nếu cần (không áp dụng trực tiếp cho logic mới)
-        # for key in st.session_state.keys():
-        #     if key.startswith('df_'):
-        #         st.session_state[key] = None
-        st.experimental_rerun()
-
-with col_download_folder:
-    with st.expander("📁 Tải file mẫu"):
-        st.markdown("Bạn có thể tải xuống các file Excel mẫu dưới đây để sử dụng với chương trình:")
-
-        template_folder = "templates"
-
-        if not os.path.exists(template_folder):
-            st.warning(f"Thư mục '{template_folder}' không tồn tại. Vui lòng tạo thư mục này và đặt các file mẫu vào đó.")
-        else:
-            for filename in os.listdir(template_folder):
-                if filename.endswith(".xlsx"):
-                    file_path = os.path.join(template_folder, filename)
-                    with open(file_path, "rb") as file:
-                        st.download_button(
-                            label=f"Tải xuống {filename}",
-                            data=file,
-                            file_name=filename,
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"download_{filename}"
-                        )
 
 # --- Các nút điều hướng chính (Expander) ---
 
@@ -289,7 +243,7 @@ with st.expander("🔌 Tổn thất các TBA công cộng"):
                 autotext.set_fontsize(4)
                 autotext.set_fontweight('bold')
 
-            ax_pie.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=5, fontweight='bold', color='black')
+            ax_pie.text(0, 0, f"Tổng số TBA\\n{pie_data.sum()}", ha='center', va='center', fontsize=5, fontweight='bold', color='black')
             ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
         else:
             ax_pie.text(0.5, 0.5, "Không có dữ liệu tỷ trọng phù hợp", horizontalalignment='center', verticalalignment='center', transform=ax_pie.transAxes, fontsize=6)
