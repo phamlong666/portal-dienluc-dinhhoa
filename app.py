@@ -71,10 +71,12 @@ all_files = list_excel_files()
 
 files = generate_filenames(nam, thang_from, thang_to if "Lũy kế" in mode else thang_from)
 df = load_data(files, all_files, "Thực hiện")
+
 if "cùng kỳ" in mode.lower() and nam_cungkỳ:
     files_ck = generate_filenames(nam_cungkỳ, thang_from, thang_to if "Lũy kế" in mode else thang_from)
     df_ck = load_data(files_ck, all_files, "Cùng kỳ")
-    df = pd.concat([df, df_ck])
+    if not df_ck.empty:
+        df = pd.concat([df, df_ck])
 
 if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     def classify_nguong(x):
@@ -87,13 +89,13 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     df["Ngưỡng tổn thất"] = df["Tỷ lệ tổn thất"].apply(classify_nguong)
 
     st.subheader(f"🔍 Biểu đồ tổn thất - Tháng {thang_from} / {nam}")
-    df_unique = df.drop_duplicates(subset="Tên TBA")
+    df_unique = df.drop_duplicates(subset=["Tên TBA", "Kỳ"])
     count_df = df_unique.groupby(["Ngưỡng tổn thất", "Kỳ"]).size().reset_index(name="Số lượng")
     pivot_df = count_df.pivot(index="Ngưỡng tổn thất", columns="Kỳ", values="Số lượng").fillna(0).astype(int)
     pivot_df = pivot_df.reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
     pivot_df = pivot_df.loc[~pivot_df.index.isnull()]
 
-    fig, ax = plt.subplots(figsize=(10, 4))
+    fig, ax = plt.subplots(figsize=(8, 4))
     width = 0.35
     x = range(len(pivot_df))
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
@@ -118,7 +120,7 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         ["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"],
         fill_value=0
     )
-    fig2, ax2 = plt.subplots(figsize=(2.2, 2.2))
+    fig2, ax2 = plt.subplots(figsize=(1.2, 1.2))
     wedges, _, autotexts = ax2.pie(
         pie_data,
         labels=None,
@@ -128,14 +130,22 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         wedgeprops={'width': 0.35}
     )
     for autotext in autotexts:
-        autotext.set_fontsize(3)  # Giảm nhỏ hơn 50%
+        autotext.set_fontsize(3)
         autotext.set_fontweight("bold")
-    ax2.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=10, fontweight='bold')
-    ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=10)
+    ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=4)
+    ax2.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=4, fontweight='bold')
     st.pyplot(fig2)
 
+    # Bộ lọc danh sách TBA
+    nguong_options = ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"]
+    nguong_filter = st.selectbox("Chọn ngưỡng để lọc danh sách TBA", nguong_options)
+    if nguong_filter != "(All)":
+        df_filtered = df[df["Ngưỡng tổn thất"] == nguong_filter]
+    else:
+        df_filtered = df
+
     st.markdown("### 📋 Danh sách chi tiết TBA")
-    st.dataframe(df.reset_index(drop=True), use_container_width=True)
+    st.dataframe(df_filtered.reset_index(drop=True), use_container_width=True)
 
 else:
     st.warning("Không có dữ liệu phù hợp để hiển thị biểu đồ.")
