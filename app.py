@@ -22,61 +22,13 @@ with col3:
 
 nguong = st.selectbox("Ngưỡng tổn thất", ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
 
-FOLDER_ID = '165Txi8IyqG50uFSFHzWidSZSG9qpsbaq'
-
-@st.cache_data
-def get_drive_service():
-    credentials = service_account.Credentials.from_service_account_info(
-        st.secrets["google"],
-        scopes=["https://www.googleapis.com/auth/drive"]
-    )
-    return build('drive', 'v3', credentials=credentials)
-
-@st.cache_data
-def list_excel_files():
-    service = get_drive_service()
-    query = f"'{FOLDER_ID}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
-    results = service.files().list(q=query, fields="files(id, name)").execute()
-    return {f['name']: f['id'] for f in results.get('files', [])}
-
-def download_excel(file_id):
-    service = get_drive_service()
-    request = service.files().get_media(fileId=file_id)
-    fh = io.BytesIO()
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while not done:
-        _, done = downloader.next_chunk()
-    fh.seek(0)
-    try:
-        return pd.read_excel(fh, sheet_name="dữ liệu")
-    except:
-        return pd.DataFrame()
-
-def generate_filenames(year, start_month, end_month):
-    return [f"TBA_{year}_{str(m).zfill(2)}.xlsx" for m in range(start_month, end_month + 1)]
-
-def load_data(file_list, all_files, nhan="Thực hiện"):
-    dfs = []
-    for fname in file_list:
-        file_id = all_files.get(fname)
-        if file_id:
-            df = download_excel(file_id)
-            if not df.empty:
-                df["Kỳ"] = nhan
-                dfs.append(df)
-    return pd.concat(dfs) if dfs else pd.DataFrame()
-
-all_files = list_excel_files()
-
-files = generate_filenames(nam, thang_from, thang_to if "Lũy kế" in mode else thang_from)
-df = load_data(files, all_files, "Thực hiện")
-
-if "cùng kỳ" in mode.lower() and nam_cungkỳ:
-    files_ck = generate_filenames(nam_cungkỳ, thang_from, thang_to if "Lũy kế" in mode else thang_from)
-    df_ck = load_data(files_ck, all_files, "Cùng kỳ")
-    if not df_ck.empty:
-        df = pd.concat([df, df_ck])
+# Dummy dữ liệu để demo
+data = {
+    "Tên TBA": ["TBA 1", "TBA 2", "TBA 3", "TBA 4", "TBA 5", "TBA 6"],
+    "Kỳ": ["Thực hiện", "Thực hiện", "Cùng kỳ", "Cùng kỳ", "Thực hiện", "Cùng kỳ"],
+    "Tỷ lệ tổn thất": [1.5, 2.8, 3.5, 4.2, 5.1, 6.3]
+}
+df = pd.DataFrame(data)
 
 if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     def classify_nguong(x):
@@ -88,9 +40,7 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         else: return ">=7%"
     df["Ngưỡng tổn thất"] = df["Tỷ lệ tổn thất"].apply(classify_nguong)
 
-    st.subheader(f"🔍 Biểu đồ tổn thất - Tháng {thang_from} / {nam}")
     df_unique = df.drop_duplicates(subset=["Tên TBA", "Kỳ"])
-
     count_df = df_unique.groupby(["Ngưỡng tổn thất", "Kỳ"]).size().reset_index(name="Số lượng")
     pivot_df = count_df.pivot(index="Ngưỡng tổn thất", columns="Kỳ", values="Số lượng").fillna(0).astype(int)
     pivot_df = pivot_df.reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
@@ -107,11 +57,12 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
             height = bar.get_height()
             ax_bar.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', va='bottom', fontsize=5, fontweight='bold', color='black')
 
-    ax_bar.set_ylabel("Số lượng", fontsize=5)
-    ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
+    ax_bar.set_ylabel("Số lượng", fontsize=3)
+    ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=4, weight='bold')
     ax_bar.set_xticks(list(x))
-    ax_bar.set_xticklabels(pivot_df.index, fontsize=5)
-    ax_bar.legend(title="Kỳ", fontsize=5)
+    ax_bar.set_xticklabels(pivot_df.index, fontsize=3)
+    ax_bar.tick_params(axis='y', labelsize=3)
+    ax_bar.legend(title="Kỳ", fontsize=3)
     ax_bar.grid(axis='y', linestyle='--', linewidth=0.5)
 
     df_latest = df_unique[df_unique['Kỳ'] == 'Thực hiện']
@@ -128,14 +79,15 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     )
 
     for text in texts:
-        text.set_fontsize(3)
-
+        text.set_fontsize(2)
+        text.set_fontweight('bold')
     for autotext in autotexts:
         autotext.set_color('black')
-        autotext.set_fontsize(3)
+        autotext.set_fontsize(2)
+        autotext.set_fontweight('bold')
 
-    ax_pie.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=4, fontweight='bold', color='black')
-    ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=5, weight='bold')
+    ax_pie.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=3, fontweight='bold', color='black')
+    ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=4, weight='bold')
 
     st.pyplot(fig)
 
@@ -147,6 +99,5 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
 
     st.markdown("### 📋 Danh sách chi tiết TBA")
     st.dataframe(df_filtered.reset_index(drop=True), use_container_width=True)
-
 else:
     st.warning("Không có dữ liệu phù hợp để hiển thị biểu đồ.")
