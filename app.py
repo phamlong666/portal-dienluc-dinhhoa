@@ -1,17 +1,17 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-import numpy as np
-import os # Import os module to handle file paths
-import matplotlib.pyplot as plt # Needed for the matplotlib charts from app moi.py
-from datetime import datetime # Needed for year selection from app moi.py
+import os
+import matplotlib.pyplot as plt # Thêm mới từ app moi.py
+from datetime import datetime # Đã có, nhưng đảm bảo có
+import io # Thêm mới từ app moi.py
+from google.oauth2 import service_account # Thêm mới từ app moi.py
+from googleapiclient.discovery import build # Thêm mới từ app moi.py
+from googleapiclient.http import MediaIoBaseDownload # Thêm mới từ app moi.py
 
-st.set_page_config(page_title="Báo cáo tổn thất TBA", layout="wide")
+st.set_page_config(layout="wide", page_title="Báo cáo tổn thất TBA")
 st.title("📥 AI_Trợ lý tổn thất")
 
-st.markdown("### 🔍 Chọn loại dữ liệu tổn thất để tải lên:")
-
-# --- Khởi tạo Session State cho dữ liệu tải lên ---
+# --- Khởi tạo Session State cho dữ liệu (Giữ nguyên cho các phần khác) ---
 if 'df_tba_thang' not in st.session_state:
     st.session_state.df_tba_thang = None
 if 'df_tba_luyke' not in st.session_state:
@@ -27,7 +27,7 @@ if 'df_ha_ck' not in st.session_state:
 if 'df_trung_thang_tt' not in st.session_state:
     st.session_state.df_trung_thang_tt = None
 if 'df_trung_luyke_tt' not in st.session_state:
-    st.session_state.df_trung_ck_tt = None # This also seems like a typo, should be df_trung_luyke_tt
+    st.session_state.df_trung_ck_tt = None
 if 'df_trung_thang_dy' not in st.session_state:
     st.session_state.df_trung_thang_dy = None
 if 'df_trung_luyke_dy' not in st.session_state:
@@ -42,94 +42,126 @@ if 'df_dv_ck' not in st.session_state:
     st.session_state.df_dv_ck = None
 
 
-# Hàm phân loại tổn thất theo ngưỡng
-def phan_loai_nghiem(x):
+# --- Biến và Hàm hỗ trợ tải dữ liệu từ Google Drive (từ app moi.py) ---
+FOLDER_ID = '165Txi8IyqG50uFSFHzWidSZSG9qpsbaq' # ID thư mục Google Drive chứa file Excel
+
+@st.cache_data
+def get_drive_service():
+    """Khởi tạo và trả về đối tượng dịch vụ Google Drive."""
+    # st.secrets["google"] phải được cấu hình trong .streamlit/secrets.toml
+    # [google]
+    # type = "service_account"
+    # project_id = "your-gcp-project-id"
+    # private_key_id = "your-private-key-id"
+    # private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+    # client_email = "your-service-account-email@your-project-id.iam.gserviceaccount.com"
+    # client_id = "your-client-id"
+    # auth_uri = "https://accounts.google.com/o/oauth2/auth"
+    # token_uri = "https://oauth2.googleapis.com/token"
+    # auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+    # client_x509_cert_url = "your-client-x509-cert-url"
     try:
+        credentials = service_account.Credentials.from_service_account_info(
+            st.secrets["google"],
+            scopes=["https://www.googleapis.com/auth/drive.readonly"] # Chỉ cần quyền đọc
+        )
+        return build('drive', 'v3', credentials=credentials)
+    except Exception as e:
+        st.error(f"Lỗi khi xác thực Google Drive: {e}. Vui lòng kiểm tra cấu hình `secrets.toml`.")
+        return None
+
+@st.cache_data
+def list_excel_files():
+    """Liệt kê các file Excel trong thư mục Google Drive đã cho."""
+    service = get_drive_service()
+    if not service:
+        return {}
+    query = f"'{FOLDER_ID}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
+    try:
+        results = service.files().list(q=query, fields="files(id, name)").execute()
+        return {f['name']: f['id'] for f in results.get('files', [])}
+    except Exception as e:
+        st.error(f"Lỗi khi liệt kê file từ Google Drive: {e}. Vui lòng kiểm tra ID thư mục và quyền truy cập.")
+        return {}
+
+@st.cache_data
+def download_excel(file_id):
+    """Tải xuống file Excel từ Google Drive bằng ID file."""
+    service = get_drive_service()
+    if not service:
+        return pd.DataFrame()
+    try:
+        request = service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+            # st.progress(status.progress()) # Có thể thêm thanh tiến trình
+        fh.seek(0)
+        return pd.read_excel(fh, sheet_name="dữ liệu")
+    except Exception as e:
+        st.warning(f"Không thể tải xuống hoặc đọc file với ID {file_id}. Lỗi: {e}. Có thể file không tồn tại hoặc không đúng định dạng sheet 'dữ liệu'.")
+        return pd.DataFrame()
+
+def generate_filenames(year, start_month, end_month):
+    """Tạo danh sách tên file dự kiến dựa trên năm và tháng."""
+    return [f"TBA_{year}_{str(m).zfill(2)}.xlsx" for m in range(start_month, end_month + 1)]
+
+def load_data(file_list, all_files, nhan="Thực hiện"):
+    """Tải và nối các DataFrame từ danh sách file."""
+    dfs = []
+    for fname in file_list:
+        file_id = all_files.get(fname)
+        if file_id:
+            df = download_excel(file_id)
+            if not df.empty:
+                df["Kỳ"] = nhan
+                dfs.append(df)
+        else:
+            st.info(f"Không tìm thấy file: {fname}")
+    return pd.concat(dfs) if dfs else pd.DataFrame()
+
+def classify_nguong(x):
+    """Phân loại tỷ lệ tổn thất vào các ngưỡng."""
+    try:
+        # Chuyển đổi sang số nếu cần, xử lý dấu phẩy thành dấu chấm
         x = float(str(x).replace(",", "."))
-    except (ValueError, AttributeError):
-        return "Không rõ"
-    if x < 2:
-        return "<2%"
-    elif 2 <= x < 3:
-        return ">=2 và <3%"
-    elif 3 <= x < 4:
-        return ">=3 và <4%"
-    elif 4 <= x < 5:
-        return ">=4 và <5%"
-    elif 5 <= x < 7:
-        return ">=5 và <7%"
-    else:
-        return ">=7%"
+    except (ValueError, TypeError):
+        return "Không rõ" # Xử lý các giá trị không phải số
 
-# Hàm xử lý DataFrame và trả về số lượng TBA theo ngưỡng
-def process_tba_data(df):
-    if df is None:
-        return None, None
-    df_temp = pd.DataFrame()
+    if x < 2: return "<2%"
+    elif 2 <= x < 3: return ">=2 và <3%"
+    elif 3 <= x < 4: return ">=3 và <4%"
+    elif 4 <= x < 5: return ">=4 và <5%"
+    elif 5 <= x < 7: return ">=5 và <7%"
+    else: return ">=7%"
 
-    # Ưu tiên tìm cột 'Tỷ lệ tổn thất' theo tên
-    # Nếu không tìm thấy, thử 'Tỷ lệ tổn thất (%)' (ví dụ từ file mẫu)
-    # Nếu vẫn không tìm thấy, kiểm tra chỉ số cột 14 như fallback cuối cùng
-    loss_rate_col_found = False
-    if 'Tỷ lệ tổn thất' in df.columns:
-        df_temp["Tỷ lệ tổn thất"] = df['Tỷ lệ tổn thất'].map(lambda x: float(str(x).replace(",", ".")) if pd.notna(x) else np.nan)
-        loss_rate_col_found = True
-    elif 'Tỷ lệ tổn thất (%)' in df.columns: # Giả định một tên cột khác có thể có
-        df_temp["Tỷ lệ tổn thất"] = df['Tỷ lệ tổn thất (%)'].map(lambda x: float(str(x).replace(",", ".")) if pd.notna(x) else np.nan)
-        loss_rate_col_found = True
-    elif df.shape[1] > 14: # fallback to index 14 (15th column)
-        # Cảnh báo: Sử dụng iloc có thể không ổn định nếu thứ tự cột thay đổi
-        # st.warning("Cảnh báo: Cột 'Tỷ lệ tổn thất' không tìm thấy theo tên. Đang sử dụng cột thứ 15 (chỉ số 14) làm 'Tỷ lệ tổn thất'. Vui lòng kiểm tra file Excel để đảm bảo chính xác.")
-        df_temp["Tỷ lệ tổn thất"] = df.iloc[:, 14].map(lambda x: float(str(x).replace(",", ".")) if pd.notna(x) else np.nan)
-        loss_rate_col_found = True
-    else:
-        st.error("Lỗi: File Excel không có cột 'Tỷ lệ tổn thất' (theo tên hoặc theo chỉ số 14). Vui lòng kiểm tra định dạng file và sheet 'dữ liệu' của bạn.")
-        return None, None
 
-    if not loss_rate_col_found:
-        return None, None # Không có cột tỷ lệ tổn thất, không thể xử lý
-
-    df_temp["Ngưỡng"] = df_temp["Tỷ lệ tổn thất"].apply(phan_loai_nghiem)
-    tong_so = len(df_temp)
-    tong_theo_nguong = df_temp["Ngưỡng"].value_counts().reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"], fill_value=0)
-    return tong_so, tong_theo_nguong, df_temp # Return df_temp as well for filtering later
-
-# --- Đặt các nút "Làm mới dữ liệu" và "Tải file mẫu" cạnh nhau ---
+# --- Các nút chính: Làm mới dữ liệu và Tải file mẫu ---
 col_refresh, col_download_folder = st.columns([1, 1])
 
 with col_refresh:
     if st.button("🔄 Làm mới dữ liệu"):
-        st.session_state.df_tba_thang = None
-        st.session_state.df_tba_luyke = None
-        st.session_state.df_tba_ck = None
-        st.session_state.df_ha_thang = None
-        st.session_state.df_ha_luyke = None
-        st.session_state.df_ha_ck = None
-        st.session_state.df_trung_thang_tt = None
-        st.session_state.df_trung_luyke_tt = None
-        st.session_state.df_trung_ck_tt = None
-        st.session_state.df_trung_thang_dy = None
-        st.session_state.df_trung_luyke_dy = None
-        st.session_state.df_trung_ck_dy = None
-        st.session_state.df_dv_thang = None
-        st.session_state.df_dv_luyke = None
-        st.session_state.df_dv_ck = None
+        # Xóa cache của Streamlit để tải lại dữ liệu từ Drive
+        st.cache_data.clear()
+        # Reset các biến session_state liên quan đến df nếu cần (không áp dụng trực tiếp cho logic mới)
+        # for key in st.session_state.keys():
+        #     if key.startswith('df_'):
+        #         st.session_state[key] = None
         st.experimental_rerun()
 
 with col_download_folder:
     with st.expander("📁 Tải file mẫu"):
         st.markdown("Bạn có thể tải xuống các file Excel mẫu dưới đây để sử dụng với chương trình:")
 
-        # Đường dẫn tới thư mục chứa file mẫu
         template_folder = "templates"
 
-        # Đảm bảo thư mục templates tồn tại
         if not os.path.exists(template_folder):
             st.warning(f"Thư mục '{template_folder}' không tồn tại. Vui lòng tạo thư mục này và đặt các file mẫu vào đó.")
         else:
-            # Lặp qua các file trong thư mục templates và tạo nút download
             for filename in os.listdir(template_folder):
-                if filename.endswith(".xlsx"): # Chỉ hiển thị các file Excel
+                if filename.endswith(".xlsx"):
                     file_path = os.path.join(template_folder, filename)
                     with open(file_path, "rb") as file:
                         st.download_button(
@@ -140,501 +172,176 @@ with col_download_folder:
                             key=f"download_{filename}"
                         )
 
+# --- Các nút điều hướng chính (Expander) ---
 
-# Tạo các tiện ích con theo phân nhóm
 with st.expander("🔌 Tổn thất các TBA công cộng"):
-    st.header("Upload dữ liệu")
-    temp_upload_tba_thang = st.file_uploader("📅 Tải dữ liệu TBA công cộng - Theo tháng", type=["xlsx"], key="tba_thang")
-    if temp_upload_tba_thang:
-        try:
-            st.session_state.df_tba_thang = pd.read_excel(temp_upload_tba_thang, sheet_name="dữ liệu")
-            st.success("✅ Đã tải dữ liệu tổn thất TBA công cộng theo tháng!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_tba_thang = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file: {e}")
-            st.session_state.df_tba_thang = None
+    st.header("Phân tích dữ liệu TBA công cộng")
 
+    # Toàn bộ nội dung từ app moi.py được chèn vào đây
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        mode = st.radio("Chế độ phân tích", ["Theo tháng", "Lũy kế", "So sánh cùng kỳ", "Lũy kế cùng kỳ"], key="tba_mode")
+    with col2:
+        thang_from = st.selectbox("Từ tháng", list(range(1, 13)), index=0, key="tba_thang_from")
+        # Đảm bảo thang_to không nhỏ hơn thang_from
+        thang_to_options = list(range(thang_from, 13))
+        # Đặt index mặc định để tránh lỗi khi thang_to_options rỗng
+        default_index_thang_to = 0 if thang_to_options else None
+        if "Lũy kế" in mode:
+            # Chọn index sao cho nó không vượt quá kích thước của list options
+            # Nếu tháng 5 là index 4 trong list 1-12, khi range bắt đầu từ 5, index 4 có thể là tháng 9
+            # Cố gắng giữ tháng 5 làm tháng cuối mặc định nếu có thể
+            if 5 in thang_to_options:
+                default_index_thang_to = thang_to_options.index(5)
+            elif len(thang_to_options) > 4: # Fallback nếu 5 không có, chọn tháng thứ 5 trong list mới
+                 default_index_thang_to = 4
+            else: # Nếu ít hơn 5 tháng, chọn tháng cuối cùng
+                 default_index_thang_to = len(thang_to_options) - 1 if thang_to_options else None
 
-    temp_upload_tba_luyke = st.file_uploader("📊 Tải dữ liệu TBA công cộng - Lũy kế", type=["xlsx"], key="tba_luyke")
-    if temp_upload_tba_luyke:
-        try:
-            st.session_state.df_tba_luyke = pd.read_excel(temp_upload_tba_luyke, sheet_name="dữ liệu")
-            st.success("✅ Đã tải dữ liệu tổn thất TBA công cộng - Lũy kế!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet: {e}. Vui lòng kiểm tra tên sheet.")
-            st.session_state.df_tba_luyke = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file Lũy kế: {e}")
-            st.session_state.df_tba_luyke = None
-
-    temp_upload_tba_ck = st.file_uploader("📈 Tải dữ liệu TBA công cộng - Cùng kỳ", type=["xlsx"], key="tba_ck")
-    if temp_upload_tba_ck:
-        try:
-            st.session_state.df_tba_ck = pd.read_excel(temp_upload_tba_ck, sheet_name="dữ liệu")
-            st.success("✅ Đã tải dữ liệu tổn thất TBA công cộng - Cùng kỳ!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet: {e}. Vui lòng kiểm tra tên sheet.")
-            st.session_state.df_tba_ck = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file Cùng kỳ: {e}")
-            st.session_state.df_tba_ck = None
-
-
-    # --- Xử lý và hiển thị dữ liệu tổng hợp nếu có ít nhất một file được tải lên ---
-    if st.session_state.df_tba_thang is not None or \
-       st.session_state.df_tba_luyke is not None or \
-       st.session_state.df_tba_ck is not None:
-
-        st.markdown("### 📊 Kết quả ánh xạ dữ liệu:")
-
-        # Xử lý dữ liệu từng loại và chuẩn bị cho biểu đồ
-        tong_so_thang, tong_theo_nguong_thang, df_thang_processed = process_tba_data(st.session_state.df_tba_thang)
-        tong_so_luyke, tong_theo_nguong_luyke, df_luyke_processed = process_tba_data(st.session_state.df_tba_luyke)
-        tong_so_ck, tong_theo_nguong_ck, df_ck_processed = process_tba_data(st.session_state.df_tba_ck)
-
-        # Combine dataframes for analysis if they exist
-        combined_df = pd.DataFrame()
-        if df_thang_processed is not None:
-            df_thang_processed['Kỳ'] = 'Theo tháng'
-            combined_df = pd.concat([combined_df, df_thang_processed.copy()]) # Use .copy() to avoid SettingWithCopyWarning
-
-        if df_luyke_processed is not None:
-            df_luyke_processed['Kỳ'] = 'Lũy kế'
-            combined_df = pd.concat([combined_df, df_luyke_processed.copy()])
-
-        if df_ck_processed is not None:
-            df_ck_processed['Kỳ'] = 'Cùng kỳ'
-            combined_df = pd.concat([combined_df, df_ck_processed.copy()])
-        
-        # Ensure 'Tên TBA' exists for dropping duplicates in combined_df
-        # This part assumes 'Tên TBA' exists in the original df_tba_thang etc.
-        # If not, it needs to be added in process_tba_data or here
-        if "Tên TBA" in st.session_state.df_tba_thang.columns if st.session_state.df_tba_thang is not None else False:
-            if df_thang_processed is not None:
-                df_thang_processed["Tên TBA"] = st.session_state.df_tba_thang["Tên TBA"]
-            if df_luyke_processed is not None:
-                df_luyke_processed["Tên TBA"] = st.session_state.df_tba_luyke["Tên TBA"]
-            if df_ck_processed is not None:
-                df_ck_processed["Tên TBA"] = st.session_state.df_tba_ck["Tên TBA"]
-        
-        # Recombine after adding 'Tên TBA'
-        combined_df = pd.DataFrame()
-        if df_thang_processed is not None:
-            df_thang_processed['Kỳ'] = 'Theo tháng'
-            combined_df = pd.concat([combined_df, df_thang_processed])
-
-        if df_luyke_processed is not None:
-            df_luyke_processed['Kỳ'] = 'Lũy kế'
-            combined_df = pd.concat([combined_df, df_luyke_processed])
-
-        if df_ck_processed is not None:
-            df_ck_processed['Kỳ'] = 'Cùng kỳ'
-            combined_df = pd.concat([combined_df, df_ck_processed])
-
-        # Analysis section from app moi.py
-        st.markdown("---")
-        st.header("📊 Phân tích tổn thất các TBA công cộng")
-
-        if not combined_df.empty:
-            # Reclassify 'Ngưỡng tổn thất' for consistency with app moi.py naming
-            # The phan_loai_nghiem function is already defined and used by process_tba_data
-            # so df_temp['Ngưỡng'] is already set. Let's rename it for consistency.
-            if "Ngưỡng" in combined_df.columns:
-                combined_df.rename(columns={"Ngưỡng": "Ngưỡng tổn thất"}, inplace=True)
-            else: # If 'Ngưỡng' not found, re-apply classification based on 'Tỷ lệ tổn thất'
-                combined_df["Ngưỡng tổn thất"] = combined_df["Tỷ lệ tổn thất"].apply(phan_loai_nghiem)
-            
-            # Use 'Kỳ' column directly from combined_df
-            df_unique = combined_df.drop_duplicates(subset=["Tên TBA", "Kỳ"]) if "Tên TBA" in combined_df.columns else combined_df.drop_duplicates(subset=["Kỳ"])
-
-
-            count_df = df_unique.groupby(["Ngưỡng tổn thất", "Kỳ"]).size().reset_index(name="Số lượng")
-            
-            # Use a simpler pivot table as the original app.py already has separate dfs for month/luyke/ck
-            # The original app.py generates its own charts from separate processed dataframes.
-            # We need to adapt this part to use the combined_df for a single matplotlib chart.
-
-            # We need to decide which 'mode' (Theo tháng, Lũy kế, Cùng kỳ) to show in the detailed plot.
-            # Let's use the 'Theo tháng' as the default for the detailed list, or combined if applicable.
-
-            # Plotly charts as per original app.py for comparison
-            col1, col2 = st.columns([2,2])
-
-            with col1:
-                st.markdown("#### 📊 Số lượng TBA theo ngưỡng tổn thất")
-                fig_bar = go.Figure()
-                colors_plotly = ['steelblue', 'darkorange', 'forestgreen', 'goldenrod', 'teal', 'red'] # Màu sắc cho từng ngưỡng
-
-                # Thêm các thanh cho "Theo tháng"
-                if tong_theo_nguong_thang is not None:
-                    fig_bar.add_trace(go.Bar(
-                        name='Theo tháng',
-                        x=tong_theo_nguong_thang.index,
-                        y=tong_theo_nguong_thang.values,
-                        text=tong_theo_nguong_thang.values,
-                        textposition='outside',
-                        textfont=dict(color='black', size=13, family='Arial')
-                    ))
-
-                # Thêm các thanh cho "Lũy kế"
-                if tong_theo_nguong_luyke is not None:
-                    fig_bar.add_trace(go.Bar(
-                        name='Lũy kế',
-                        x=tong_theo_nguong_luyke.index,
-                        y=tong_theo_nguong_luyke.values,
-                        text=tong_theo_nguong_luyke.values,
-                        textposition='outside',
-                        textfont=dict(color='black', size=13, family='Arial')
-                    ))
-
-                # Thêm các thanh cho "Cùng kỳ"
-                if tong_theo_nguong_ck is not None:
-                    fig_bar.add_trace(go.Bar(
-                        name='Cùng kỳ',
-                        x=tong_theo_nguong_ck.index,
-                        y=tong_theo_nguong_ck.values,
-                        text=tong_theo_nguong_ck.values,
-                        textposition='outside',
-                        textfont=dict(color='black', size=13, family='Arial')
-                    ))
-
-                fig_bar.update_layout(
-            xaxis=dict(title_font=dict(color='black', size=14, family='Arial',), tickfont=dict(color='black', size=13, family='Arial')),
-            yaxis=dict(title_font=dict(color='black', size=14, family='Arial'), tickfont=dict(color='black', size=13, family='Arial')),
-                    barmode='group',
-                    height=400,
-                    xaxis_title='Ngưỡng tổn thất',
-                    yaxis_title='Số lượng TBA',
-                    margin=dict(l=20, r=20, t=40, b=40),
-                    legend_title_text='Loại dữ liệu'
-                )
-                st.plotly_chart(fig_bar, use_container_width=True)
-
-            with col2:
-                st.markdown("#### 🧩 Tỷ trọng TBA theo ngưỡng tổn thất")
-
-                if tong_theo_nguong_thang is not None:
-                    st.markdown(f"##### Theo tháng (Tổng số: {tong_so_thang})")
-                    fig_pie_thang = go.Figure(data=[
-                        go.Pie(
-                            labels=tong_theo_nguong_thang.index,
-                            values=tong_theo_nguong_thang.values,
-                            hole=0.5,
-                            marker=dict(colors=colors_plotly),
-                            textinfo='percent+label', textfont=dict(color='black', size=13, family='Arial'),
-                            name='Theo tháng'
-                        )
-                    ])
-                    fig_pie_thang.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=40), showlegend=False)
-                    st.plotly_chart(fig_pie_thang, use_container_width=True)
-
-                if tong_theo_nguong_luyke is not None:
-                    st.markdown(f"##### Lũy kế (Tổng số: {tong_so_luyke})")
-                    fig_pie_luyke = go.Figure(data=[
-                        go.Pie(
-                            labels=tong_theo_nguong_luyke.index,
-                            values=tong_theo_nguong_luyke.values,
-                            hole=0.5,
-                            marker=dict(colors=colors_plotly),
-                            textinfo='percent+label', textfont=dict(color='black', size=13, family='Arial'),
-                            name='Lũy kế'
-                        )
-                    ])
-                    fig_pie_luyke.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=40), showlegend=False)
-                    st.plotly_chart(fig_pie_luyke, use_container_width=True)
-
-                if tong_theo_nguong_ck is not None:
-                    st.markdown(f"##### Cùng kỳ (Tổng số: {tong_so_ck})")
-                    fig_pie_ck = go.Figure(data=[
-                        go.Pie(
-                            labels=tong_theo_nguong_ck.index,
-                            values=tong_theo_nguong_ck.values,
-                            hole=0.5,
-                            marker=dict(colors=colors_plotly),
-                            textinfo='percent+label', textfont=dict(color='black', size=13, family='Arial'),
-                            name='Cùng kỳ'
-                        )
-                    ])
-                    fig_pie_ck.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=40), showlegend=False)
-                    st.plotly_chart(fig_pie_ck, use_container_width=True)
-
-            # Matplotlib charts from app moi.py
-            st.markdown("### 📈 Biểu đồ tổng hợp các kỳ")
-            # Create a pivot table for the matplotlib chart
-            pivot_df_mpl = count_df.pivot(index="Ngưỡng tổn thất", columns="Kỳ", values="Số lượng").fillna(0).astype(int)
-            pivot_df_mpl = pivot_df_mpl.reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
-
-            fig_mpl, (ax_bar_mpl, ax_pie_mpl) = plt.subplots(1, 2, figsize=(10, 3), dpi=300)
-
-            x_mpl = range(len(pivot_df_mpl))
-            width_mpl = 0.25 # Adjusted width for possibly more bars
-            colors_mpl = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'] # Consistent colors
-
-            for i, col in enumerate(pivot_df_mpl.columns):
-                offset = (i - (len(pivot_df_mpl.columns)-1)/2) * width_mpl
-                bars = ax_bar_mpl.bar([xi + offset for xi in x_mpl], pivot_df_mpl[col], width_mpl, label=col, color=colors_mpl[i % len(colors_mpl)])
-                for bar in bars:
-                    height = bar.get_height()
-                    if height > 0:
-                        ax_bar_mpl.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', va='bottom', fontsize=5, fontweight='bold', color='black')
-
-            ax_bar_mpl.set_ylabel("Số lượng", fontsize=5)
-            ax_bar_mpl.set_title("Số lượng TBA theo ngưỡng tổn thất (Tổng hợp)", fontsize=6, weight='bold')
-            ax_bar_mpl.set_xticks(list(x_mpl))
-            ax_bar_mpl.set_xticklabels(pivot_df_mpl.index, fontsize=5)
-            ax_bar_mpl.tick_params(axis='y', labelsize=5)
-            ax_bar_mpl.legend(title="Kỳ", fontsize=5)
-            ax_bar_mpl.grid(axis='y', linestyle='--', linewidth=0.5)
-
-            # For the pie chart, we'll use the 'Theo tháng' data if available, or the first available data.
-            pie_data_mpl = None
-            if 'Theo tháng' in pivot_df_mpl.columns:
-                pie_data_mpl = pivot_df_mpl['Theo tháng']
-            elif not pivot_df_mpl.empty:
-                pie_data_mpl = pivot_df_mpl.iloc[:, 0] # Use the first column if 'Theo tháng' isn't there
-
-            if pie_data_mpl is not None and pie_data_mpl.sum() > 0:
-                wedges, texts, autotexts = ax_pie_mpl.pie(
-                    pie_data_mpl,
-                    labels=pivot_df_mpl.index,
-                    autopct='%1.1f%%',
-                    startangle=90,
-                    colors=colors_mpl,
-                    pctdistance=0.75,
-                    wedgeprops={'width': 0.3, 'edgecolor': 'w'}
-                )
-
-                for text in texts:
-                    text.set_fontsize(4)
-                    text.set_fontweight('bold')
-                for autotext in autotexts:
-                    autotext.set_color('black')
-                    autotext.set_fontsize(4)
-                    autotext.set_fontweight('bold')
-
-                ax_pie_mpl.text(0, 0, f"Tổng số TBA\n{pie_data_mpl.sum()}", ha='center', va='center', fontsize=5, fontweight='bold', color='black')
-                ax_pie_mpl.set_title("Tỷ trọng TBA theo ngưỡng tổn thất (Theo tháng)", fontsize=6, weight='bold')
-            else:
-                ax_pie_mpl.text(0.5, 0.5, "Không có dữ liệu pie chart", horizontalalignment='center', verticalalignment='center', transform=ax_pie_mpl.transAxes, fontsize=6)
-                ax_pie_mpl.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
-
-            st.pyplot(fig_mpl)
-
-
-        # Display mapped DataFrame for "Theo tháng" file (original app.py logic)
-        if st.session_state.df_tba_thang is not None:
-            st.markdown("##### Dữ liệu TBA công cộng - Theo tháng:")
-            df_test = st.session_state.df_tba_thang
-            df_result = pd.DataFrame()
-
-            expected_cols = {
-                "Tên TBA": "Tên TBA",
-                "Công suất": "Công suất",
-                "Điện nhận": "Điện nhận",
-                "Điện thương phẩm": "Điện thương phẩm",
-                "Điện tổn thất": "Điện tổn thất",
-                "Tỷ lệ tổn thất": "Tỷ lệ tổn thất", # or 'Tỷ lệ tổn thất (%)'
-                "Kế hoạch": "Kế hoạch",
-                "So sánh": "So sánh"
-            }
-
-            missing_cols = [col_name for df_col_name, col_name in expected_cols.items() if col_name not in df_test.columns]
-
-            if 'Tỷ lệ tổn thất' not in df_test.columns and 'Tỷ lệ tổn thất (%)' in df_test.columns:
-                expected_cols['Tỷ lệ tổn thất'] = 'Tỷ lệ tổn thất (%)'
-                missing_cols = [col_name for df_col_name, col_name in expected_cols.items() if col_name not in df_test.columns]
-
-
-            if missing_cols:
-                st.warning(f"Dữ liệu TBA công cộng - Theo tháng: Thiếu các cột sau để ánh xạ: {', '.join(missing_cols)}. Vui lòng kiểm tra cấu trúc sheet 'dữ liệu'.")
-            else:
-                try:
-                    df_result["STT"] = range(1, len(df_test) + 1)
-                    df_result["Tên TBA"] = df_test[expected_cols["Tên TBA"]]
-                    df_result["Công suất"] = df_test[expected_cols["Công suất"]]
-                    df_result["Điện nhận"] = df_test[expected_cols["Điện nhận"]]
-
-                    if expected_cols["Điện nhận"] in df_test.columns and expected_cols["Điện thương phẩm"] in df_test.columns:
-                         df_result["Thương phẩm"] = df_test[expected_cols["Điện nhận"]] - df_test[expected_cols["Điện thương phẩm"]]
-                    else:
-                        df_result["Thương phẩm"] = np.nan
-                        st.warning("Không đủ cột để tính Thương phẩm. Đảm bảo có cột 'Điện nhận' và 'Điện thương phẩm'.")
-
-                    df_result["Điện tổn thất"] = df_test[expected_cols["Điện tổn thất"]].round(0).astype("Int64", errors='ignore')
-                    # Ensure 'Tỷ lệ tổn thất' is correctly converted for display
-                    df_result["Tỷ lệ tổn thất"] = df_test[expected_cols["Tỷ lệ tổn thất"]].map(lambda x: f"{float(str(x).replace(',', '.')):.2f}".replace(".", ",") if pd.notna(x) else "")
-                    df_result["Kế hoạch"] = df_test[expected_cols["Kế hoạch"]].map(lambda x: f"{float(str(x).replace(',', '.')):.2f}".replace(".", ",") if pd.notna(x) else "")
-                    df_result["So sánh"] = df_test[expected_cols["So sánh"]].map(lambda x: f"{float(str(x).replace(',', '.')):.2f}".replace(".", ",") if pd.notna(x) else "")
-                    
-                    # Apply phan_loai_nghiem on the *numeric* 'Tỷ lệ tổn thất' before mapping to string
-                    df_result["Ngưỡng"] = df_test[expected_cols["Tỷ lệ tổn thất"]].apply(phan_loai_nghiem)
-                    nguong_options = ["Tất cả", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"]
-                    
-                    chon_nguong = st.selectbox("🎯 Lọc theo ngưỡng tổn thất:", nguong_options, key="tba_thang_nguong_filter")
-                    
-                    if chon_nguong != "Tất cả":
-                        df_result = df_result[df_result["Ngưỡng"] == chon_nguong]
-                    
-                    df_result["Ngưỡng"] = pd.Categorical(df_result["Ngưỡng"], categories=["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"], ordered=True)
-
-                    st.dataframe(df_result, use_container_width=True)
-                except KeyError as e:
-                    st.error(f"Lỗi khi ánh xạ dữ liệu: Không tìm thấy cột cần thiết '{e}'. Vui lòng kiểm tra tên cột trong file Excel của bạn trên sheet 'dữ liệu'.")
-                except Exception as e:
-                    st.error(f"Đã xảy ra lỗi không mong muốn khi hiển thị DataFrame: {e}")
+            thang_to = st.selectbox("Đến tháng", thang_to_options, index=default_index_thang_to, key="tba_thang_to")
         else:
-            st.warning("Không có dữ liệu TBA công cộng được tải lên để phân tích.")
+            thang_to = thang_from # Nếu không phải lũy kế, tháng đến bằng tháng từ
 
+    with col3:
+        nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="tba_nam")
+        nam_cungkỳ = nam - 1 if "cùng kỳ" in mode.lower() else None
+
+    nguong_display = st.selectbox("Ngưỡng tổn thất", ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"], key="tba_nguong_display")
+
+    # Tải dữ liệu từ Google Drive
+    all_files = list_excel_files()
+
+    files = generate_filenames(nam, thang_from, thang_to if "Lũy kế" in mode or "cùng kỳ" in mode.lower() else thang_from)
+    df = load_data(files, all_files, "Thực hiện")
+
+    if "cùng kỳ" in mode.lower() and nam_cungkỳ:
+        files_ck = generate_filenames(nam_cungkỳ, thang_from, thang_to if "Lũy kế" in mode or "cùng kỳ" in mode.lower() else thang_from)
+        df_ck = load_data(files_ck, all_files, "Cùng kỳ")
+        if not df_ck.empty:
+            # Đảm bảo cột "Kỳ" là string để có thể concat
+            df_ck["Kỳ"] = "Cùng kỳ"
+            df = pd.concat([df, df_ck])
+
+    if not df.empty and "Tỷ lệ tổn thất" in df.columns:
+        # Đảm bảo cột Tỷ lệ tổn thất là số để apply classify_nguong
+        df["Tỷ lệ tổn thất"] = pd.to_numeric(df["Tỷ lệ tổn thất"].astype(str).str.replace(',', '.'), errors='coerce')
+        df["Ngưỡng tổn thất"] = df["Tỷ lệ tổn thất"].apply(classify_nguong)
+
+        # Drop duplicates based on 'Tên TBA' and 'Kỳ' to count unique TBAs per period
+        df_unique = df.drop_duplicates(subset=["Tên TBA", "Kỳ"])
+
+        # Create count_df and pivot_df for plotting
+        count_df = df_unique.groupby(["Ngưỡng tổn thất", "Kỳ"]).size().reset_index(name="Số lượng")
+        pivot_df = count_df.pivot(index="Ngưỡng tổn thất", columns="Kỳ", values="Số lượng").fillna(0).astype(int)
+        # Sắp xếp lại thứ tự các ngưỡng
+        pivot_df = pivot_df.reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
+
+        # --- Vẽ biểu đồ ---
+        fig, (ax_bar, ax_pie) = plt.subplots(1, 2, figsize=(10, 3), dpi=300)
+
+        # Biểu đồ cột
+        x = range(len(pivot_df))
+        width = 0.35
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'] # Màu sắc cho các cột
+        for i, col in enumerate(pivot_df.columns):
+            offset = (i - (len(pivot_df.columns)-1)/2) * width
+            bars = ax_bar.bar([xi + offset for xi in x], pivot_df[col], width, label=col, color=colors[i % len(colors)])
+            for bar in bars:
+                height = bar.get_height()
+                if height > 0:
+                    ax_bar.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', va='bottom', fontsize=5, fontweight='bold', color='black')
+
+        ax_bar.set_ylabel("Số lượng", fontsize=5)
+        ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
+        ax_bar.set_xticks(list(x))
+        ax_bar.set_xticklabels(pivot_df.index, fontsize=5)
+        ax_bar.tick_params(axis='y', labelsize=5)
+        ax_bar.legend(title="Kỳ", fontsize=5)
+        ax_bar.grid(axis='y', linestyle='--', linewidth=0.5)
+
+        # Biểu đồ tròn (Tỷ trọng) - Ưu tiên dữ liệu 'Thực hiện' hoặc kỳ đầu tiên nếu không có
+        pie_data = pd.Series(0, index=pivot_df.index) # Default empty
+        if 'Thực hiện' in df_unique['Kỳ'].unique():
+            df_latest = df_unique[df_unique['Kỳ'] == 'Thực hiện']
+            pie_data = df_latest["Ngưỡng tổn thất"].value_counts().reindex(pivot_df.index, fill_value=0)
+        elif not df_unique.empty and not pivot_df.empty:
+            # Fallback to the first available period if 'Thực hiện' is not present
+            first_col_data = pivot_df.iloc[:, 0]
+            if first_col_data.sum() > 0:
+                pie_data = first_col_data
+
+        if pie_data.sum() > 0:
+            wedges, texts, autotexts = ax_pie.pie(
+                pie_data,
+                labels=pivot_df.index,
+                autopct='%1.1f%%',
+                startangle=90,
+                colors=colors,
+                pctdistance=0.75,
+                wedgeprops={'width': 0.3, 'edgecolor': 'w'}
+            )
+
+            for text in texts:
+                text.set_fontsize(4)
+                text.set_fontweight('bold')
+            for autotext in autotexts:
+                autotext.set_color('black')
+                autotext.set_fontsize(4)
+                autotext.set_fontweight('bold')
+
+            ax_pie.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=5, fontweight='bold', color='black')
+            ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
+        else:
+            ax_pie.text(0.5, 0.5, "Không có dữ liệu tỷ trọng phù hợp", horizontalalignment='center', verticalalignment='center', transform=ax_pie.transAxes, fontsize=6)
+            ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
+
+
+        st.pyplot(fig)
+
+        # --- Danh sách chi tiết TBA ---
+        nguong_filter = st.selectbox("Chọn ngưỡng để lọc danh sách TBA", ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"], key="tba_detail_filter")
+        if nguong_filter != "(All)":
+            df_filtered = df[df["Ngưỡng tổn thất"] == nguong_filter]
+        else:
+            df_filtered = df
+
+        st.markdown("### 📋 Danh sách chi tiết TBA")
+        st.dataframe(df_filtered.reset_index(drop=True), use_container_width=True)
+
+    else:
+        st.warning("Không có dữ liệu phù hợp để hiển thị biểu đồ. Vui lòng kiểm tra các file Excel trên Google Drive và định dạng của chúng (cần cột 'Tỷ lệ tổn thất').")
 
 with st.expander("⚡ Tổn thất hạ thế"):
-    upload_ha_thang = st.file_uploader("📅 Tải dữ liệu hạ áp - Theo tháng", type=["xlsx"], key="ha_thang")
-    if upload_ha_thang:
-        try:
-            st.session_state.df_ha_thang = pd.read_excel(upload_ha_thang, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất hạ áp - Theo tháng!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet hạ áp theo tháng: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_ha_thang = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file hạ áp theo tháng: {e}")
-            st.session_state.df_ha_thang = None
-
-    upload_ha_luyke = st.file_uploader("📊 Tải dữ liệu hạ áp - Lũy kế", type=["xlsx"], key="ha_luyke")
-    if upload_ha_luyke:
-        try:
-            st.session_state.df_ha_luyke = pd.read_excel(upload_ha_luyke, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất hạ áp - Lũy kế!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet hạ áp lũy kế: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_ha_luyke = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file hạ áp lũy kế: {e}")
-            st.session_state.df_ha_luyke = None
-
-    upload_ha_ck = st.file_uploader("📈 Tải dữ liệu hạ áp - Cùng kỳ", type=["xlsx"], key="ha_ck")
-    if upload_ha_ck:
-        try:
-            st.session_state.df_ha_ck = pd.read_excel(upload_ha_ck, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất hạ áp - Cùng kỳ!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet hạ áp cùng kỳ: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_ha_ck = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file hạ áp cùng kỳ: {e}")
-            st.session_state.df_ha_ck = None
+    st.header("Phân tích dữ liệu tổn thất hạ thế")
+    st.info("Nội dung phân tích mới cho tổn thất hạ thế sẽ được viết tại đây.")
+    if st.session_state.df_ha_thang is not None:
+        st.dataframe(st.session_state.df_ha_thang)
+    else:
+        st.warning("Chưa có dữ liệu tổn thất hạ thế để hiển thị.")
 
 
-with st.expander("⚡ Tổn thất trung thế (TBA Trung thế)"): # Đổi tên hiển thị cho rõ ràng
-    upload_trung_thang_tt = st.file_uploader("📅 Tải dữ liệu TBA Trung áp - Theo tháng", type=["xlsx"], key="trung_thang_tt")
-    if upload_trung_thang_tt:
-        try:
-            st.session_state.df_trung_thang_tt = pd.read_excel(upload_trung_thang_tt, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất TBA Trung áp (Trung thế) - Theo tháng!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet trung áp (TT) theo tháng: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_trung_thang_tt = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file trung áp (TT) theo tháng: {e}")
-            st.session_state.df_trung_thang_tt = None
-
-    upload_trung_luyke_tt = st.file_uploader("📊 Tải dữ liệu TBA Trung áp - Lũy kế", type=["xlsx"], key="trung_luyke_tt")
-    if upload_trung_luyke_tt:
-        try:
-            st.session_state.df_trung_luyke_tt = pd.read_excel(upload_trung_luyke_tt, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất TBA Trung áp (Trung thế) - Lũy kế!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet trung áp (TT) lũy kế: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_trung_luyke_tt = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file trung áp (TT) lũy kế: {e}")
-            st.session_state.df_trung_luyke_tt = None
-
-    upload_trung_ck_tt = st.file_uploader("📈 Tải dữ liệu TBA Trung áp - Cùng kỳ", type=["xlsx"], key="trung_ck_tt")
-    if upload_trung_ck_tt:
-        try:
-            st.session_state.df_trung_ck_tt = pd.read_excel(upload_trung_ck_tt, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất TBA Trung áp (Trung thế) - Cùng kỳ!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet trung áp (TT) cùng kỳ: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_trung_ck_tt = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file trung áp (TT) cùng kỳ: {e}")
-            st.session_state.df_trung_ck_tt = None
+with st.expander("⚡ Tổn thất trung thế (TBA Trung thế)"):
+    st.header("Phân tích dữ liệu TBA Trung áp (Trung thế)")
+    st.info("Nội dung phân tích mới cho TBA Trung thế sẽ được viết tại đây.")
+    if st.session_state.df_trung_thang_tt is not None:
+        st.dataframe(st.session_state.df_trung_thang_tt)
+    else:
+        st.warning("Chưa có dữ liệu TBA Trung áp (Trung thế) để hiển thị.")
 
 
 with st.expander("⚡ Tổn thất các đường dây trung thế"):
-    upload_trung_thang_dy = st.file_uploader("📅 Tải dữ liệu Đường dây Trung thế - Theo tháng", type=["xlsx"], key="trung_thang_dy")
-    if upload_trung_thang_dy:
-        try:
-            st.session_state.df_trung_thang_dy = pd.read_excel(upload_trung_thang_dy, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất Đường dây Trung thế - Theo tháng!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet đường dây trung thế theo tháng: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_trung_thang_dy = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file đường dây trung thế theo tháng: {e}")
-            st.session_state.df_trung_thang_dy = None
-
-    upload_trung_luyke_dy = st.file_uploader("📊 Tải dữ liệu Đường dây Trung thế - Lũy kế", type=["xlsx"], key="trung_luyke_dy")
-    if upload_trung_luyke_dy:
-        try:
-            st.session_state.df_trung_luyke_dy = pd.read_excel(upload_trung_luyke_dy, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất Đường dây Trung thế - Lũy kế!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet đường dây trung thế lũy kế: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_trung_luyke_dy = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file đường dây trung thế lũy kế: {e}")
-            st.session_state.df_trung_luyke_dy = None
-
-    upload_trung_ck_dy = st.file_uploader("📈 Tải dữ liệu Đường dây Trung thế - Cùng kỳ", type=["xlsx"], key="trung_ck_dy")
-    if upload_trung_ck_dy:
-        try:
-            st.session_state.df_trung_ck_dy = pd.read_excel(upload_trung_ck_dy, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất Đường dây Trung thế - Cùng kỳ!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet đường dây trung thế cùng kỳ: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_trung_ck_dy = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file đường dây trung thế cùng kỳ: {e}")
-            st.session_state.df_trung_ck_dy = None
+    st.header("Phân tích dữ liệu tổn thất Đường dây Trung thế")
+    st.info("Nội dung phân tích mới cho đường dây trung thế sẽ được viết tại đây.")
+    if st.session_state.df_trung_thang_dy is not None:
+        st.dataframe(st.session_state.df_trung_thang_dy)
+    else:
+        st.warning("Chưa có dữ liệu tổn thất Đường dây Trung thế để hiển thị.")
 
 
 with st.expander("🏢 Tổn thất toàn đơn vị"):
-    upload_dv_thang = st.file_uploader("📅 Tải dữ liệu Đơn vị - Theo tháng", type=["xlsx"], key="dv_thang")
-    if upload_dv_thang:
-        try:
-            st.session_state.df_dv_thang = pd.read_excel(upload_dv_thang, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất Toàn đơn vị - Theo tháng!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet đơn vị theo tháng: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_dv_thang = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file đơn vị theo tháng: {e}")
-            st.session_state.df_dv_thang = None
-
-    upload_dv_luyke = st.file_uploader("📊 Tải dữ liệu Đơn vị - Lũy kế", type=["xlsx"], key="dv_luyke")
-    if upload_dv_luyke:
-        try:
-            st.session_state.df_dv_luyke = pd.read_excel(upload_dv_luyke, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất Toàn đơn vị - Lũy kế!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet đơn vị lũy kế: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_dv_luyke = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file đơn vị lũy kế: {e}")
-            st.session_state.df_dv_luyke = None
-
-    upload_dv_ck = st.file_uploader("📈 Tải dữ liệu Đơn vị - Cùng kỳ", type=["xlsx"], key="dv_ck")
-    if upload_dv_ck:
-        try:
-            st.session_state.df_dv_ck = pd.read_excel(upload_dv_ck, sheet_name="dữ liệu", skiprows=6)
-            st.success("✅ Đã tải dữ liệu tổn thất Toàn đơn vị - Cùng kỳ!")
-        except ValueError as e:
-            st.error(f"Lỗi khi đọc sheet đơn vị cùng kỳ: {e}. Vui lòng kiểm tra tên sheet trong file Excel.")
-            st.session_state.df_dv_ck = None
-        except Exception as e:
-            st.error(f"Đã xảy ra lỗi không mong muốn khi đọc file đơn vị cùng kỳ: {e}")
-            st.session_state.df_dv_ck = None
+    st.header("Phân tích dữ liệu tổn thất Toàn đơn vị")
+    st.info("Nội dung phân tích mới cho toàn đơn vị sẽ được viết tại đây.")
+    if st.session_state.df_dv_thang is not None:
+        st.dataframe(st.session_state.df_dv_thang)
+    else:
+        st.warning("Chưa có dữ liệu tổn thất Toàn đơn vị để hiển thị.")
