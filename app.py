@@ -90,6 +90,7 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
 
     st.subheader(f"🔍 Biểu đồ tổn thất - Tháng {thang_from} / {nam}")
     df_unique = df.drop_duplicates(subset=["Tên TBA", "Kỳ"])
+
     count_df = df_unique.groupby(["Ngưỡng tổn thất", "Kỳ"]).size().reset_index(name="Số lượng")
     pivot_df = count_df.pivot(index="Ngưỡng tổn thất", columns="Kỳ", values="Số lượng").fillna(0).astype(int)
     pivot_df = pivot_df.reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
@@ -116,11 +117,14 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
 
     # BIỂU ĐỒ DONUT
     st.markdown("### 🎯 Tỷ trọng TBA theo ngưỡng tổn thất")
-    pie_data = df_unique["Ngưỡng tổn thất"].value_counts().reindex(
+
+    df_latest = df_unique[df_unique['Kỳ'] == 'Thực hiện']  # Chỉ lấy trạm duy nhất ở kỳ hiện tại, không cộng cùng kỳ
+    pie_data = df_latest["Ngưỡng tổn thất"].value_counts().reindex(
         ["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"],
         fill_value=0
     )
-    fig2, ax2 = plt.subplots(figsize=(1.2, 1.2))
+
+    fig2, ax2 = plt.subplots(figsize=(2.5, 2.5))
     wedges, _, autotexts = ax2.pie(
         pie_data,
         labels=None,
@@ -130,10 +134,10 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         wedgeprops={'width': 0.35}
     )
     for autotext in autotexts:
-        autotext.set_fontsize(3)
+        autotext.set_fontsize(6)
         autotext.set_fontweight("bold")
-    ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=4)
-    ax2.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=4, fontweight='bold')
+    ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=6)
+    ax2.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=6, fontweight='bold')
     st.pyplot(fig2)
 
     # Bộ lọc danh sách TBA
