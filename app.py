@@ -1,6 +1,11 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from datetime import datetime
+import io
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
 st.set_page_config(layout="wide", page_title="Phân tích tổn thất TBA công cộng")
 st.title("📊 Phân tích tổn thất các TBA công cộng")
@@ -30,7 +35,7 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     df_latest = df_unique[df_unique['Kỳ'] == 'Thực hiện']
     pie_data = df_latest["Ngưỡng tổn thất"].value_counts().reindex(pivot_df.index, fill_value=0)
 
-    fig, (ax_bar, ax_pie) = plt.subplots(1, 2, figsize=(12, 5), dpi=300)
+    fig, (ax_bar, ax_pie) = plt.subplots(1, 2, figsize=(6, 2.5), dpi=300)
 
     x = range(len(pivot_df))
     width = 0.35
@@ -39,11 +44,11 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         offset = (i - (len(pivot_df.columns)-1)/2) * width
         ax_bar.bar([xi + offset for xi in x], pivot_df[col], width, label=col, color=colors[i % len(colors)])
 
-    ax_bar.set_ylabel("Số lượng", fontsize=8)
-    ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=10, weight='bold')
+    ax_bar.set_ylabel("Số lượng", fontsize=6)
+    ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=8, weight='bold')
     ax_bar.set_xticks(list(x))
-    ax_bar.set_xticklabels(pivot_df.index, fontsize=7)
-    ax_bar.legend(title="Kỳ", fontsize=6)
+    ax_bar.set_xticklabels(pivot_df.index, fontsize=6)
+    ax_bar.legend(title="Kỳ", fontsize=5)
     ax_bar.grid(axis='y', linestyle='--', linewidth=0.5)
 
     wedges, texts, autotexts = ax_pie.pie(
@@ -58,10 +63,10 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
 
     for autotext in autotexts:
         autotext.set_color('black')
-        autotext.set_fontsize(6)
+        autotext.set_fontsize(5)
 
-    ax_pie.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=8, fontweight='bold', color='black')
-    ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=10, weight='bold')
+    ax_pie.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=6, fontweight='bold', color='black')
+    ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=8, weight='bold')
 
     st.pyplot(fig)
 
