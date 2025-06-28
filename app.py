@@ -10,7 +10,6 @@ from googleapiclient.http import MediaIoBaseDownload
 st.set_page_config(layout="wide", page_title="Phân tích tổn thất TBA công cộng")
 st.title("📊 Phân tích tổn thất các TBA công cộng")
 
-# ============ CẤU HÌNH ==========
 col1, col2, col3 = st.columns(3)
 with col1:
     mode = st.radio("Chế độ phân tích", ["Theo tháng", "Lũy kế", "So sánh cùng kỳ", "Lũy kế cùng kỳ"])
@@ -114,8 +113,12 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
 
     # BIỂU ĐỒ DONUT
     st.markdown("### 🎯 Tỷ trọng TBA theo ngưỡng tổn thất")
-    pie_data = df["Ngưỡng tổn thất"].value_counts().reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"], fill_value=0)
-    fig2, ax2 = plt.subplots(figsize=(3, 3))
+    df_unique = df.drop_duplicates(subset="Tên TBA")  # Chỉnh: loại trùng TBA
+    pie_data = df_unique["Ngưỡng tổn thất"].value_counts().reindex(
+        ["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"],
+        fill_value=0
+    )
+    fig2, ax2 = plt.subplots(figsize=(2.5, 2.5))  # Chỉnh nhỏ biểu đồ
     wedges, _, autotexts = ax2.pie(
         pie_data,
         labels=None,
@@ -131,7 +134,6 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     ax2.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=10)
     st.pyplot(fig2)
 
-    # HIỂN THỊ DỮ LIỆU CHI TIẾT
     st.markdown("### 📋 Danh sách chi tiết TBA")
     st.dataframe(df.reset_index(drop=True), use_container_width=True)
 
