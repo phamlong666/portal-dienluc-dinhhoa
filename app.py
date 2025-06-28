@@ -102,13 +102,16 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
     for i, col in enumerate(pivot_df.columns):
         offset = (i - (len(pivot_df.columns)-1)/2) * width
-        ax_bar.bar([xi + offset for xi in x], pivot_df[col], width, label=col, color=colors[i % len(colors)])
+        bars = ax_bar.bar([xi + offset for xi in x], pivot_df[col], width, label=col, color=colors[i % len(colors)])
+        for bar in bars:
+            height = bar.get_height()
+            ax_bar.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', va='bottom', fontsize=4, fontweight='bold', color='black')
 
-    ax_bar.set_ylabel("Số lượng", fontsize=6)
-    ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=8, weight='bold')
+    ax_bar.set_ylabel("Số lượng", fontsize=4)
+    ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=5, weight='bold')
     ax_bar.set_xticks(list(x))
-    ax_bar.set_xticklabels(pivot_df.index, fontsize=6)
-    ax_bar.legend(title="Kỳ", fontsize=5)
+    ax_bar.set_xticklabels(pivot_df.index, fontsize=4)
+    ax_bar.legend(title="Kỳ", fontsize=4)
     ax_bar.grid(axis='y', linestyle='--', linewidth=0.5)
 
     df_latest = df_unique[df_unique['Kỳ'] == 'Thực hiện']
@@ -126,10 +129,10 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
 
     for autotext in autotexts:
         autotext.set_color('black')
-        autotext.set_fontsize(5)
+        autotext.set_fontsize(4)
 
-    ax_pie.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=6, fontweight='bold', color='black')
-    ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=8, weight='bold')
+    ax_pie.text(0, 0, f"Tổng số TBA\n{pie_data.sum()}", ha='center', va='center', fontsize=5, fontweight='bold', color='black')
+    ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=5, weight='bold')
 
     st.pyplot(fig)
 
