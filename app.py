@@ -10,13 +10,73 @@ from googleapiclient.http import MediaIoBaseDownload
 st.set_page_config(layout="wide", page_title="Phân tích tổn thất TBA công cộng")
 st.title("📊 Phân tích tổn thất các TBA công cộng")
 
-# Dummy dataframe tạm để tránh lỗi (anh thay bằng dữ liệu thực tế sau)
-data = {
-    "Tên TBA": ["TBA 1", "TBA 2", "TBA 3", "TBA 4", "TBA 5", "TBA 6"],
-    "Kỳ": ["Thực hiện", "Thực hiện", "Cùng kỳ", "Cùng kỳ", "Thực hiện", "Cùng kỳ"],
-    "Tỷ lệ tổn thất": [1.5, 2.8, 3.5, 4.2, 5.1, 6.3]
-}
-df = pd.DataFrame(data)
+col1, col2, col3 = st.columns(3)
+with col1:
+    mode = st.radio("Chế độ phân tích", ["Theo tháng", "Lũy kế", "So sánh cùng kỳ", "Lũy kế cùng kỳ"])
+with col2:
+    thang_from = st.selectbox("Từ tháng", list(range(1, 13)), index=0)
+    thang_to = st.selectbox("Đến tháng", list(range(thang_from, 13)), index=4) if "Lũy kế" in mode else thang_from
+with col3:
+    nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0)
+    nam_cungkỳ = nam - 1 if "cùng kỳ" in mode.lower() else None
+
+nguong = st.selectbox("Ngưỡng tổn thất", ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
+
+FOLDER_ID = '165Txi8IyqG50uFSFHzWidSZSG9qpsbaq'
+
+@st.cache_data
+def get_drive_service():
+    credentials = service_account.Credentials.from_service_account_info(
+        st.secrets["google"],
+        scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    return build('drive', 'v3', credentials=credentials)
+
+@st.cache_data
+def list_excel_files():
+    service = get_drive_service()
+    query = f"'{FOLDER_ID}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
+    results = service.files().list(q=query, fields="files(id, name)").execute()
+    return {f['name']: f['id'] for f in results.get('files', [])}
+
+def download_excel(file_id):
+    service = get_drive_service()
+    request = service.files().get_media(fileId=file_id)
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+    fh.seek(0)
+    try:
+        return pd.read_excel(fh, sheet_name="dữ liệu")
+    except:
+        return pd.DataFrame()
+
+def generate_filenames(year, start_month, end_month):
+    return [f"TBA_{year}_{str(m).zfill(2)}.xlsx" for m in range(start_month, end_month + 1)]
+
+def load_data(file_list, all_files, nhan="Thực hiện"):
+    dfs = []
+    for fname in file_list:
+        file_id = all_files.get(fname)
+        if file_id:
+            df = download_excel(file_id)
+            if not df.empty:
+                df["Kỳ"] = nhan
+                dfs.append(df)
+    return pd.concat(dfs) if dfs else pd.DataFrame()
+
+all_files = list_excel_files()
+
+files = generate_filenames(nam, thang_from, thang_to if "Lũy kế" in mode else thang_from)
+df = load_data(files, all_files, "Thực hiện")
+
+if "cùng kỳ" in mode.lower() and nam_cungkỳ:
+    files_ck = generate_filenames(nam_cungkỳ, thang_from, thang_to if "Lũy kế" in mode else thang_from)
+    df_ck = load_data(files_ck, all_files, "Cùng kỳ")
+    if not df_ck.empty:
+        df = pd.concat([df, df_ck])
 
 if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     def classify_nguong(x):
@@ -28,12 +88,12 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
         else: return ">=7%"
     df["Ngưỡng tổn thất"] = df["Tỷ lệ tổn thất"].apply(classify_nguong)
 
+    st.subheader(f"🔍 Biểu đồ tổn thất - Tháng {thang_from} / {nam}")
     df_unique = df.drop_duplicates(subset=["Tên TBA", "Kỳ"])
+
     count_df = df_unique.groupby(["Ngưỡng tổn thất", "Kỳ"]).size().reset_index(name="Số lượng")
     pivot_df = count_df.pivot(index="Ngưỡng tổn thất", columns="Kỳ", values="Số lượng").fillna(0).astype(int)
-
-    df_latest = df_unique[df_unique['Kỳ'] == 'Thực hiện']
-    pie_data = df_latest["Ngưỡng tổn thất"].value_counts().reindex(pivot_df.index, fill_value=0)
+    pivot_df = pivot_df.reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
 
     fig, (ax_bar, ax_pie) = plt.subplots(1, 2, figsize=(6, 2.5), dpi=300)
 
@@ -50,6 +110,9 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
     ax_bar.set_xticklabels(pivot_df.index, fontsize=6)
     ax_bar.legend(title="Kỳ", fontsize=5)
     ax_bar.grid(axis='y', linestyle='--', linewidth=0.5)
+
+    df_latest = df_unique[df_unique['Kỳ'] == 'Thực hiện']
+    pie_data = df_latest["Ngưỡng tổn thất"].value_counts().reindex(pivot_df.index, fill_value=0)
 
     wedges, texts, autotexts = ax_pie.pie(
         pie_data,
@@ -70,8 +133,7 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
 
     st.pyplot(fig)
 
-    nguong_options = ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"]
-    nguong_filter = st.selectbox("Chọn ngưỡng để lọc danh sách TBA", nguong_options)
+    nguong_filter = st.selectbox("Chọn ngưỡng để lọc danh sách TBA", ["(All)", "<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
     if nguong_filter != "(All)":
         df_filtered = df[df["Ngưỡng tổn thất"] == nguong_filter]
     else:
@@ -79,5 +141,6 @@ if not df.empty and "Tỷ lệ tổn thất" in df.columns:
 
     st.markdown("### 📋 Danh sách chi tiết TBA")
     st.dataframe(df_filtered.reset_index(drop=True), use_container_width=True)
+
 else:
     st.warning("Không có dữ liệu phù hợp để hiển thị biểu đồ.")
