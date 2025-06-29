@@ -299,3 +299,75 @@ with st.expander("🏢 Tổn thất toàn đơn vị"):
         st.dataframe(st.session_state.df_dv_thang)
     else:
         st.warning("Chưa có dữ liệu tổn thất Toàn đơn vị để hiển thị.")
+
+with st.expander("⚡ Tổn thất hạ thế"):
+    st.header("Phân tích dữ liệu tổn thất hạ thế")
+
+    FOLDER_ID_HA = '1_rAY5T-unRyw20YwMgKuG1C0y7oq6GkK'
+
+    @st.cache_data
+    def list_excel_files_ha():
+        service = get_drive_service()
+        if not service:
+            return {}
+        query = f"'{FOLDER_ID_HA}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
+        try:
+            results = service.files().list(q=query, fields="files(id, name)").execute()
+            return {f['name']: f['id'] for f in results.get('files', [])}
+        except Exception as e:
+            st.error(f"Lỗi liệt kê file hạ thế: {e}")
+            return {}
+
+    all_files_ha = list_excel_files_ha()
+    nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="ha_nam")
+    loai_bc = st.radio("Loại báo cáo", ["Tháng", "Lũy kế"], index=0, key="ha_loai_bc")
+    thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="ha_thang")
+
+    selected_files = [f for f in all_files_ha if f"HA_{nam}_" in f]
+    selected_files.sort()
+
+    df_list = []
+    for fname in selected_files:
+        month = int(fname.split("_")[2].split(".")[0])
+        if month <= thang:
+            file_id = all_files_ha.get(fname)
+            if file_id:
+                df = download_excel(file_id)
+                if not df.empty and df.shape[0] >= 1:
+                    try:
+                        ty_le = float(str(df.iloc[0, 4]).replace(",", "."))  # Cột E
+                        ton_that = float(str(df.iloc[0, 3]).replace(",", "."))  # Cột D
+                        thuong_pham = float(str(df.iloc[0, 1]).replace(",", "."))  # Cột B
+                        df_list.append({"Tháng": month, "Tỷ lệ": ty_le, "Tổn thất": ton_that, "Thương phẩm": thuong_pham})
+                    except:
+                        st.warning(f"Lỗi đọc file: {fname}")
+
+    df_final = pd.DataFrame(df_list)
+    df_final = df_final.sort_values("Tháng")
+
+    if not df_final.empty:
+        if loai_bc == "Lũy kế":
+            tong_ton_that = df_final["Tổn thất"].sum()
+            tong_thuong_pham = df_final["Thương phẩm"].sum()
+            ty_le_luyke = (tong_ton_that / tong_thuong_pham) * 100 if tong_thuong_pham > 0 else 0
+            df_final = pd.DataFrame({"Tháng": [f"Lũy kế đến T{thang}"], "Tỷ lệ": [ty_le_luyke]})
+        else:
+            df_final = df_final[df_final["Tháng"] == thang]
+
+        fig, ax = plt.subplots(figsize=(6, 3), dpi=150)
+        ax.plot(df_final["Tháng"], df_final["Tỷ lệ"], marker='o', color='black', linewidth=1)
+
+        for i, v in enumerate(df_final["Tỷ lệ"]):
+            ax.text(df_final["Tháng"].iloc[i], v + 0.05, f"{v:.2f}", ha='center', fontsize=6, color='black')
+
+        ax.set_ylabel("Tỷ lệ (%)", fontsize=8, color='black')
+        ax.set_xlabel("Tháng", fontsize=8, color='black')
+        ax.tick_params(axis='both', colors='black', labelsize=6)
+        ax.grid(True, linestyle='--', linewidth=0.5)
+        ax.set_title("Biểu đồ tỷ lệ tổn thất hạ thế", fontsize=9, color='black')
+
+        st.pyplot(fig)
+        st.dataframe(df_final)
+
+    else:
+        st.warning("Không có dữ liệu phù hợp để hiển thị.")
