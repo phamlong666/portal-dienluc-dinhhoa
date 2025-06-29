@@ -191,8 +191,7 @@ with st.expander("🔌 Tổn thất các TBA công cộng"):
         pivot_df = pivot_df.reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
 
         # --- Vẽ biểu đồ ---
-        # Increased DPI to 600 for sharpness, adjusted figsize for better presentation
-        fig, (ax_bar, ax_pie) = plt.subplots(1, 2, figsize=(10, 4), dpi=600)
+        fig, (ax_bar, ax_pie) = plt.subplots(1, 2, figsize=(10, 3), dpi=300)
 
         # Biểu đồ cột
         x = range(len(pivot_df))
@@ -204,22 +203,15 @@ with st.expander("🔌 Tổn thất các TBA công cộng"):
             for bar in bars:
                 height = bar.get_height()
                 if height > 0:
-                    # Adjusted fontsize for bar value labels
-                    ax_bar.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', va='bottom', fontsize=7, fontweight='bold', color='black')
+                    ax_bar.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', va='bottom', fontsize=5, fontweight='bold', color='black')
 
-        # Adjusted fontsize for y-axis label
-        ax_bar.set_ylabel("Số lượng", fontsize=8)
-        # Adjusted fontsize and weight for title
-        ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=10, weight='bold')
+        ax_bar.set_ylabel("Số lượng", fontsize=5)
+        ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
         ax_bar.set_xticks(list(x))
-        # Adjusted fontsize for x-axis tick labels
-        ax_bar.set_xticklabels(pivot_df.index, fontsize=7)
-        # Adjusted fontsize for y-axis tick labels
-        ax_bar.tick_params(axis='y', labelsize=7)
-        # Adjusted fontsize for legend
-        ax_bar.legend(title="Kỳ", fontsize=7)
-        # Adjusted gridline properties
-        ax_bar.grid(axis='y', linestyle='--', linewidth=0.7, alpha=0.6)
+        ax_bar.set_xticklabels(pivot_df.index, fontsize=5)
+        ax_bar.tick_params(axis='y', labelsize=5)
+        ax_bar.legend(title="Kỳ", fontsize=5)
+        ax_bar.grid(axis='y', linestyle='--', linewidth=0.5)
 
         # Biểu đồ tròn (Tỷ trọng) - Ưu tiên dữ liệu 'Thực hiện' hoặc kỳ đầu tiên nếu không có
         pie_data = pd.Series(0, index=pivot_df.index) # Default empty
@@ -244,24 +236,18 @@ with st.expander("🔌 Tổn thất các TBA công cộng"):
             )
 
             for text in texts:
-                # Adjusted fontsize for pie chart labels
-                text.set_fontsize(6)
+                text.set_fontsize(4)
                 text.set_fontweight('bold')
             for autotext in autotexts:
                 autotext.set_color('black')
-                # Adjusted fontsize for autopct values
-                autotext.set_fontsize(6)
+                autotext.set_fontsize(4)
                 autotext.set_fontweight('bold')
 
-            # Adjusted fontsize for total TBA text
-            ax_pie.text(0, 0, f"Tổng số TBA\\n{pie_data.sum()}", ha='center', va='center', fontsize=7, fontweight='bold', color='black')
-            # Adjusted fontsize and weight for pie chart title
-            ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=10, weight='bold')
+            ax_pie.text(0, 0, f"Tổng số TBA\\n{pie_data.sum()}", ha='center', va='center', fontsize=5, fontweight='bold', color='black')
+            ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
         else:
-            # Adjusted fontsize for no data text
-            ax_pie.text(0.5, 0.5, "Không có dữ liệu tỷ trọng phù hợp", horizontalalignment='center', verticalalignment='center', transform=ax_pie.transAxes, fontsize=8)
-            # Adjusted fontsize and weight for pie chart title
-            ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=10, weight='bold')
+            ax_pie.text(0.5, 0.5, "Không có dữ liệu tỷ trọng phù hợp", horizontalalignment='center', verticalalignment='center', transform=ax_pie.transAxes, fontsize=6)
+            ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
 
 
         st.pyplot(fig)
@@ -278,7 +264,6 @@ with st.expander("🔌 Tổn thất các TBA công cộng"):
 
     else:
         st.warning("Không có dữ liệu phù hợp để hiển thị biểu đồ. Vui lòng kiểm tra các file Excel trên Google Drive và định dạng của chúng (cần cột 'Tỷ lệ tổn thất').")
-
 
 
 
@@ -302,169 +287,70 @@ with st.expander("⚡ Tổn thất hạ thế"):
 
     all_files_ha = list_excel_files_ha()
     nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="ha_nam")
-    loai_bc = st.radio("Loại báo cáo", ["Tháng", "Lũy kế"], horizontal=True, key="ha_loai_bc")
     thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="ha_thang")
 
-    months = list(range(1, 13))
-    df_th = pd.DataFrame({"Tháng": months, "Tỷ lệ": [None]*12})
-    df_ck = pd.DataFrame({"Tháng": months, "Tỷ lệ": [None]*12})
+    df_list_th = []
+    df_list_ck = []
+    df_list_kh = []
 
-    tong_ton_that = 0
-    tong_thuong_pham = 0
-
-    for i in range(1, 13):
+    for i in range(1, thang + 1):
         fname = f"HA_{nam}_{i:02}.xlsx"
-        file_id = all_files_ha.get(fname)
-
-        if file_id and i <= thang:
-            df = download_excel(file_id)
-            if not df.empty and df.shape[0] >= 1:
-                try:
-                    ty_le_th = float(str(df.iloc[0, 4]).replace(",", "."))
-                    ton_that = float(str(df.iloc[0, 3]).replace(",", "."))
-                    thuong_pham = float(str(df.iloc[0, 1]).replace(",", "."))
-
-                    if loai_bc == "Lũy kế":
-                        tong_ton_that += ton_that
-                        tong_thuong_pham += thuong_pham
-                        ty_le_lk = (tong_ton_that / tong_thuong_pham) * 100 if tong_thuong_pham > 0 else 0
-                        df_th.loc[df_th["Tháng"] == i, "Tỷ lệ"] = ty_le_lk
-                    else:
-                        df_th.loc[df_th["Tháng"] == i, "Tỷ lệ"] = ty_le_th
-                except:
-                    st.warning(f"Lỗi đọc file: {fname}")
-
-        # Cùng kỳ luôn lấy đủ 12 tháng
         fname_ck = f"HA_{nam - 1}_{i:02}.xlsx"
+        file_id = all_files_ha.get(fname)
         file_id_ck = all_files_ha.get(fname_ck)
-        if file_id_ck:
-            df_ck_file = download_excel(file_id_ck)
-            if not df_ck_file.empty and df_ck_file.shape[0] >= 1:
-                try:
-                    ty_le_ck = float(str(df_ck_file.iloc[0, 4]).replace(",", "."))
-                    df_ck.loc[df_ck["Tháng"] == i, "Tỷ lệ"] = ty_le_ck
-                except:
-                    pass
 
-    if df_th["Tỷ lệ"].notna().any():
-        # Changed figsize for a slightly smaller plot, and DPI for sharpness
-        fig, ax = plt.subplots(figsize=(6, 3), dpi=600) # Increased DPI to 600 for sharpness, adjusted figsize
-
-        ax.plot(df_th["Tháng"], df_th["Tỷ lệ"], color='#1f77b4', label='Thực hiện', linewidth=1, markersize=3, marker='o') # Adjusted linewidth and markersize
-        if df_ck["Tỷ lệ"].notna().any():
-            ax.plot(df_ck["Tháng"], df_ck["Tỷ lệ"], color='#ff7f0e', label='Cùng kỳ', linewidth=1, markersize=3, marker='o') # Adjusted linewidth and markersize
-
-        for i, v in df_th.dropna(subset=["Tỷ lệ"]).iterrows():
-            ax.text(v["Tháng"], v["Tỷ lệ"] + 0.05, f"{v['Tỷ lệ']:.2f}", ha='center', fontsize=6, color='black') # Adjusted fontsize to 6
-
-        if df_ck["Tỷ lệ"].notna().any():
-            for i, v in df_ck.dropna(subset=["Tỷ lệ"]).iterrows():
-                ax.text(v["Tháng"], v["Tỷ lệ"] + 0.05, f"{v['Tỷ lệ']:.2f}", ha='center', fontsize=6, color='black') # Adjusted fontsize to 6
-
-        ax.set_ylabel("Tỷ lệ (%)", fontsize=7, color='black') # Adjusted fontsize to 7
-        ax.set_xlabel("Tháng", fontsize=7, color='black') # Adjusted fontsize to 7
-        ax.set_xticks(months)
-        ax.tick_params(axis='both', colors='black', labelsize=6) # Adjusted labelsize to 6
-        ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.7) # Adjusted linewidth and alpha for grid
-        ax.set_title("Biểu đồ tỷ lệ tổn thất hạ thế", fontsize=9, color='black') # Adjusted fontsize to 9
-        ax.legend(fontsize=7, frameon=False) # Adjusted fontsize to 7
-
-        st.pyplot(fig)
-        st.dataframe(df_th)
-
-    else:
-        st.warning("Không có dữ liệu phù hợp để hiển thị.")
-
-with st.expander("⚡ Tổn thất trung thế"):
-    st.header("Phân tích dữ liệu TBA Trung thế")
-
-    FOLDER_ID_TRUNG = '1-Ph2auxlinL5Y3bxE7AeeAeYE2KDALJT'
-
-    @st.cache_data
-    def list_excel_files_trung():
-        service = get_drive_service()
-        if not service:
-            return {}
-        query = f"'{FOLDER_ID_TRUNG}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
-        try:
-            results = service.files().list(q=query, fields="files(id, name)").execute()
-            return {f['name']: f['id'] for f in results.get('files', [])}
-        except Exception as e:
-            st.error(f"Lỗi liệt kê file trung thế: {e}")
-            return {}
-
-    all_files_trung = list_excel_files_trung()
-    nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="trung_nam")
-    loai_bc = st.radio("Loại báo cáo", ["Tháng", "Lũy kế"], horizontal=True, key="trung_loai_bc")
-    thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="trung_thang")
-
-    months = list(range(1, 13))
-    df_th = pd.DataFrame({"Tháng": months, "Tỷ lệ": [None]*12})
-    df_ck = pd.DataFrame({"Tháng": months, "Tỷ lệ": [None]*12})
-
-    tong_ton_that = 0
-    tong_thuong_pham = 0
-
-    for i in range(1, 13):
-        fname = f"TA_{nam}_{i:02}.xlsx"
-        file_id = all_files_trung.get(fname)
-
-        if file_id and i <= thang:
+        if file_id:
             df = download_excel(file_id)
             if not df.empty and df.shape[0] >= 1:
                 try:
-                    ty_le_th = float(str(df.iloc[0, 4]).replace(",", "."))
-                    ton_that = float(str(df.iloc[0, 3]).replace(",", "."))
-                    thuong_pham = float(str(df.iloc[0, 1]).replace(",", "."))
+                    ty_le_th = float(str(df.iloc[0, 4]).replace(",", "."))  # cột E
+                    ty_le_ck = float(str(df.iloc[0, 5]).replace(",", ".")) if df.shape[1] >= 6 else None
+                    ty_le_kh = float(str(df.iloc[0, 6]).replace(",", ".")) if df.shape[1] >= 7 else None
 
-                    if loai_bc == "Lũy kế":
-                        tong_ton_that += ton_that
-                        tong_thuong_pham += thuong_pham
-                        ty_le_lk = (tong_ton_that / tong_thuong_pham) * 100 if tong_thuong_pham > 0 else 0
-                        df_th.loc[df_th["Tháng"] == i, "Tỷ lệ"] = ty_le_lk
-                    else:
-                        df_th.loc[df_th["Tháng"] == i, "Tỷ lệ"] = ty_le_th
+                    df_list_th.append({"Tháng": i, "Tỷ lệ": ty_le_th})
+                    if ty_le_ck is not None:
+                        df_list_ck.append({"Tháng": i, "Tỷ lệ": ty_le_ck})
+                    if ty_le_kh is not None:
+                        df_list_kh.append({"Tháng": i, "Tỷ lệ": ty_le_kh})
                 except:
                     st.warning(f"Lỗi đọc file: {fname}")
 
-        fname_ck = f"TA_{nam - 1}_{i:02}.xlsx"
-        file_id_ck = all_files_trung.get(fname_ck)
-        if file_id_ck:
-            df_ck_file = download_excel(file_id_ck)
-            if not df_ck_file.empty and df_ck_file.shape[0] >= 1:
-                try:
-                    ty_le_ck = float(str(df_ck_file.iloc[0, 4]).replace(",", "."))
-                    df_ck.loc[df_ck["Tháng"] == i, "Tỷ lệ"] = ty_le_ck
-                except:
-                    pass
+    df_th = pd.DataFrame(df_list_th)
+    df_ck = pd.DataFrame(df_list_ck)
+    df_kh = pd.DataFrame(df_list_kh)
 
-    if df_th["Tỷ lệ"].notna().any():
-        fig, ax = plt.subplots(figsize=(6, 3), dpi=600)
+    if not df_th.empty:
+        fig, ax = plt.subplots(figsize=(6, 3), dpi=150)
 
-        ax.plot(df_th["Tháng"], df_th["Tỷ lệ"], color='#1f77b4', label='Thực hiện', linewidth=1, markersize=3, marker='o')
-        if df_ck["Tỷ lệ"].notna().any():
-            ax.plot(df_ck["Tháng"], df_ck["Tỷ lệ"], color='#ff7f0e', label='Cùng kỳ', linewidth=1, markersize=3, marker='o')
+        ax.plot(df_th["Tháng"], df_th["Tỷ lệ"], marker='o', color='blue', label='Thực hiện', linewidth=1)
+        if not df_ck.empty:
+            ax.plot(df_ck["Tháng"], df_ck["Tỷ lệ"], marker='o', color='orange', label='Cùng kỳ', linewidth=1)
+        if not df_kh.empty:
+            ax.plot(df_kh["Tháng"], df_kh["Tỷ lệ"], marker='o', color='gray', label='Kế hoạch', linewidth=1)
 
-        for i, v in df_th.dropna(subset=["Tỷ lệ"]).iterrows():
-            ax.text(v["Tháng"], v["Tỷ lệ"] + 0.05, f"{v['Tỷ lệ']:.2f}", ha='center', fontsize=6, color='black')
+        for i, v in enumerate(df_th["Tỷ lệ"]):
+            ax.text(df_th["Tháng"].iloc[i], v + 0.05, f"{v:.2f}", ha='center', fontsize=6, color='black')
 
-        if df_ck["Tỷ lệ"].notna().any():
-            for i, v in df_ck.dropna(subset=["Tỷ lệ"]).iterrows():
-                ax.text(v["Tháng"], v["Tỷ lệ"] + 0.05, f"{v['Tỷ lệ']:.2f}", ha='center', fontsize=6, color='black')
-
-        ax.set_ylabel("Tỷ lệ (%)", fontsize=7, color='black')
-        ax.set_xlabel("Tháng", fontsize=7, color='black')
-        ax.set_xticks(months)
+        ax.set_ylabel("Tỷ lệ (%)", fontsize=8, color='black')
+        ax.set_xlabel("Tháng", fontsize=8, color='black')
         ax.tick_params(axis='both', colors='black', labelsize=6)
-        ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.7)
-        ax.set_title("Biểu đồ tỷ lệ tổn thất trung thế", fontsize=9, color='black')
-        ax.legend(fontsize=7, frameon=False)
+        ax.grid(True, linestyle='--', linewidth=0.5)
+        ax.set_title("Biểu đồ tỷ lệ tổn thất hạ thế", fontsize=10, color='black')
+        ax.legend(fontsize=6)
 
         st.pyplot(fig)
         st.dataframe(df_th)
 
     else:
         st.warning("Không có dữ liệu phù hợp để hiển thị.")
+with st.expander("⚡ Tổn thất trung thế (TBA Trung thế)"):
+    st.header("Phân tích dữ liệu TBA Trung áp (Trung thế)")
+    st.info("Nội dung phân tích mới cho TBA Trung thế sẽ được viết tại đây.")
+    if st.session_state.df_trung_thang_tt is not None:
+        st.dataframe(st.session_state.df_trung_thang_tt)
+    else:
+        st.warning("Chưa có dữ liệu TBA Trung áp (Trung thế) để hiển thị.")
+
 
 
 with st.expander("⚡ Tổn thất các đường dây trung thế"):
@@ -528,91 +414,8 @@ Lũy kế: {ty_le_luy_ke:.2f}%", fontsize=9, color='black')
         st.warning("Không tìm thấy file phù hợp để hiển thị.")
 with st.expander("🏢 Tổn thất toàn đơn vị"):
     st.header("Phân tích dữ liệu tổn thất Toàn đơn vị")
-
-    FOLDER_ID_DV = '1bPmINKlAHJMWUcxonMSnuLGz9ErlPEUi'
-
-    @st.cache_data
-    def list_excel_files_dv():
-        service = get_drive_service()
-        if not service:
-            return {}
-        query = f"'{FOLDER_ID_DV}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
-        try:
-            results = service.files().list(q=query, fields="files(id, name)").execute()
-            return {f['name']: f['id'] for f in results.get('files', [])}
-        except Exception as e:
-            st.error(f"Lỗi liệt kê file toàn đơn vị: {e}")
-            return {}
-
-    all_files_dv = list_excel_files_dv()
-    nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="dv_nam")
-    loai_bc = st.radio("Loại báo cáo", ["Tháng", "Lũy kế"], horizontal=True, key="dv_loai_bc")
-    thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="dv_thang")
-
-    months = list(range(1, 13))
-    df_th = pd.DataFrame({"Tháng": months, "Tỷ lệ": [None]*12})
-    df_ck = pd.DataFrame({"Tháng": months, "Tỷ lệ": [None]*12})
-
-    tong_ton_that = 0
-    tong_thuong_pham = 0
-
-    for i in range(1, 13):
-        fname = f"DV_{nam}_{i:02}.xlsx"
-        file_id = all_files_dv.get(fname)
-
-        if file_id and i <= thang:
-            df = download_excel(file_id)
-            if not df.empty and df.shape[0] >= 1:
-                try:
-                    ty_le_th = float(str(df.iloc[0, 4]).replace(",", "."))
-                    ton_that = float(str(df.iloc[0, 3]).replace(",", "."))
-                    thuong_pham = float(str(df.iloc[0, 1]).replace(",", "."))
-
-                    if loai_bc == "Lũy kế":
-                        tong_ton_that += ton_that
-                        tong_thuong_pham += thuong_pham
-                        ty_le_lk = (tong_ton_that / tong_thuong_pham) * 100 if tong_thuong_pham > 0 else 0
-                        df_th.loc[df_th["Tháng"] == i, "Tỷ lệ"] = ty_le_lk
-                    else:
-                        df_th.loc[df_th["Tháng"] == i, "Tỷ lệ"] = ty_le_th
-                except:
-                    st.warning(f"Lỗi đọc file: {fname}")
-
-        fname_ck = f"DV_{nam - 1}_{i:02}.xlsx"
-        file_id_ck = all_files_dv.get(fname_ck)
-        if file_id_ck:
-            df_ck_file = download_excel(file_id_ck)
-            if not df_ck_file.empty and df_ck_file.shape[0] >= 1:
-                try:
-                    ty_le_ck = float(str(df_ck_file.iloc[0, 4]).replace(",", "."))
-                    df_ck.loc[df_ck["Tháng"] == i, "Tỷ lệ"] = ty_le_ck
-                except:
-                    pass
-
-    if df_th["Tỷ lệ"].notna().any():
-        fig, ax = plt.subplots(figsize=(6, 3), dpi=600)
-
-        ax.plot(df_th["Tháng"], df_th["Tỷ lệ"], color='#1f77b4', label='Thực hiện', linewidth=1, markersize=3, marker='o')
-        if df_ck["Tỷ lệ"].notna().any():
-            ax.plot(df_ck["Tháng"], df_ck["Tỷ lệ"], color='#ff7f0e', label='Cùng kỳ', linewidth=1, markersize=3, marker='o')
-
-        for i, v in df_th.dropna(subset=["Tỷ lệ"]).iterrows():
-            ax.text(v["Tháng"], v["Tỷ lệ"] + 0.05, f"{v['Tỷ lệ']:.2f}", ha='center', fontsize=6, color='black')
-
-        if df_ck["Tỷ lệ"].notna().any():
-            for i, v in df_ck.dropna(subset=["Tỷ lệ"]).iterrows():
-                ax.text(v["Tháng"], v["Tỷ lệ"] + 0.05, f"{v['Tỷ lệ']:.2f}", ha='center', fontsize=6, color='black')
-
-        ax.set_ylabel("Tỷ lệ (%)", fontsize=7, color='black')
-        ax.set_xlabel("Tháng", fontsize=7, color='black')
-        ax.set_xticks(months)
-        ax.tick_params(axis='both', colors='black', labelsize=6)
-        ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.7)
-        ax.set_title("Biểu đồ tỷ lệ tổn thất toàn đơn vị", fontsize=9, color='black')
-        ax.legend(fontsize=7, frameon=False)
-
-        st.pyplot(fig)
-        st.dataframe(df_th)
-
+    st.info("Nội dung phân tích mới cho toàn đơn vị sẽ được viết tại đây.")
+    if st.session_state.df_dv_thang is not None:
+        st.dataframe(st.session_state.df_dv_thang)
     else:
-        st.warning("Không có dữ liệu phù hợp để hiển thị.")
+        st.warning("Chưa có dữ liệu tổn thất Toàn đơn vị để hiển thị.")
