@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import io
 from google.oauth2 import service_account
-from googleapapi.discovery import build
+from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 st.set_page_config(layout="wide", page_title="Báo cáo tổn thất TBA")
