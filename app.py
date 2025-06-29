@@ -333,19 +333,26 @@ with st.expander("⚡ Tổn thất hạ thế"):
                     pass
 
     if df_th["Tỷ lệ"].notna().any():
-        fig, ax = plt.subplots(figsize=(4, 1.5), dpi=300)
+        fig, ax = plt.subplots(figsize=(2.4, 0.9), dpi=300)
 
-        ax.plot(df_th["Tháng"], df_th["Tỷ lệ"], color='#1f77b4', label='Thực hiện', linewidth=0.6, markersize=1.5)
+        ax.plot(df_th["Tháng"], df_th["Tỷ lệ"], color='#1f77b4', label='Thực hiện', linewidth=0.4, markersize=1.2, marker='o')
         if df_ck["Tỷ lệ"].notna().any():
-            ax.plot(df_ck["Tháng"], df_ck["Tỷ lệ"], color='#ff7f0e', label='Cùng kỳ', linewidth=0.6, markersize=1.5)
+            ax.plot(df_ck["Tháng"], df_ck["Tỷ lệ"], color='#ff7f0e', label='Cùng kỳ', linewidth=0.4, markersize=1.2, marker='o')
 
-        ax.set_ylabel("Tỷ lệ (%)", fontsize=6, color='black')
-        ax.set_xlabel("Tháng", fontsize=6, color='black')
+        for i, v in df_th.dropna(subset=["Tỷ lệ"]).iterrows():
+            ax.text(v["Tháng"], v["Tỷ lệ"] + 0.05, f"{v['Tỷ lệ']:.2f}", ha='center', fontsize=4, color='black')
+
+        if df_ck["Tỷ lệ"].notna().any():
+            for i, v in df_ck.dropna(subset=["Tỷ lệ"]).iterrows():
+                ax.text(v["Tháng"], v["Tỷ lệ"] + 0.05, f"{v['Tỷ lệ']:.2f}", ha='center', fontsize=4, color='black')
+
+        ax.set_ylabel("Tỷ lệ (%)", fontsize=5, color='black')
+        ax.set_xlabel("Tháng", fontsize=5, color='black')
         ax.set_xticks(months)
-        ax.tick_params(axis='both', colors='black', labelsize=5)
+        ax.tick_params(axis='both', colors='black', labelsize=4)
         ax.grid(True, linestyle='--', linewidth=0.2, alpha=0.5)
-        ax.set_title("Biểu đồ tỷ lệ tổn thất hạ thế", fontsize=7, color='black')
-        ax.legend(fontsize=5, frameon=False)
+        ax.set_title("Biểu đồ tỷ lệ tổn thất hạ thế", fontsize=6, color='black')
+        ax.legend(fontsize=4, frameon=False)
 
         st.pyplot(fig)
         st.dataframe(df_th)
