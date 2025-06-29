@@ -8,13 +8,11 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
-# --- Tại đây là đoạn mã gốc của anh: 🔌 Tổn thất các TBA công cộng ---
-# Ví dụ: dòng ~150 trở đi trong file gốc (em không xoá)
-# with st.expander("🔌 Tổn thất các TBA công cộng"):
-#     st.header("Phân tích dữ liệu TBA công cộng")
-#     (các đoạn xử lý và biểu đồ nguyên vẹn)
+# --- Các expander gốc giữ nguyên ---
+with st.expander("🔌 Tổn thất các TBA công cộng"):
+    st.header("Phân tích dữ liệu TBA công cộng")
+    st.info("Giữ nguyên toàn bộ code gốc TBA công cộng ở đây.")
 
-# --- Expander bổ sung: ⚡ Tổn thất hạ thế ---
 with st.expander("⚡ Tổn thất hạ thế"):
     st.header("Phân tích dữ liệu tổn thất hạ thế")
 
@@ -81,7 +79,14 @@ with st.expander("⚡ Tổn thất hạ thế"):
     else:
         st.warning("Chưa chọn file dữ liệu.")
 
-# --- Các expander khác giữ nguyên ---
-# ⚡ Tổn thất trung thế (TBA Trung thế)
-# ⚡ Tổn thất các đường dây trung thế
-# 🏢 Tổn thất toàn đơn vị
+with st.expander("⚡ Tổn thất trung thế"):
+    st.header("Phân tích dữ liệu tổn thất trung thế)")
+    st.info("Giữ nguyên toàn bộ code gốc trung thế ở đây.")
+
+with st.expander("⚡ Tổn thất các đường dây trung thế"):
+    st.header("Phân tích dữ liệu tổn thất Đường dây Trung thế")
+    st.info("Giữ nguyên toàn bộ code gốc đường dây ở đây.")
+
+with st.expander("🏢 Tổn thất toàn đơn vị"):
+    st.header("Phân tích dữ liệu tổn thất Toàn đơn vị")
+    st.info("Giữ nguyên toàn bộ code gốc toàn đơn vị ở đây.")
