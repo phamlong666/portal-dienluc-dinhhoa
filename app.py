@@ -87,7 +87,7 @@ def download_excel(file_id):
             status, done = downloader.next_chunk()
             # st.progress(status.progress()) # Có thể thêm thanh tiến trình
         fh.seek(0)
-        return pd.read_excel(fh, sheet_name=0)
+        return pd.read_excel(fh, sheet_name="dữ liệu")
     except Exception as e:
         st.warning(f"Không thể tải xuống hoặc đọc file với ID {file_id}. Lỗi: {e}. Có thể file không tồn tại hoặc không đúng định dạng sheet 'dữ liệu'.")
         return pd.DataFrame()
@@ -265,84 +265,15 @@ with st.expander("🔌 Tổn thất các TBA công cộng"):
     else:
         st.warning("Không có dữ liệu phù hợp để hiển thị biểu đồ. Vui lòng kiểm tra các file Excel trên Google Drive và định dạng của chúng (cần cột 'Tỷ lệ tổn thất').")
 
-
-
 with st.expander("⚡ Tổn thất hạ thế"):
     st.header("Phân tích dữ liệu tổn thất hạ thế")
-
-    FOLDER_ID_HA = '1_rAY5T-unRyw20YwMgKuG1C0y7oq6GkK'
-
-    @st.cache_data
-    def list_excel_files_ha():
-        service = get_drive_service()
-        if not service:
-            return {}
-        query = f"'{FOLDER_ID_HA}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
-        try:
-            results = service.files().list(q=query, fields="files(id, name)").execute()
-            return {f['name']: f['id'] for f in results.get('files', [])}
-        except Exception as e:
-            st.error(f"Lỗi liệt kê file hạ thế: {e}")
-            return {}
-
-    all_files_ha = list_excel_files_ha()
-    nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="ha_nam")
-    thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="ha_thang")
-
-    df_list_th = []
-    df_list_ck = []
-    df_list_kh = []
-
-    for i in range(1, thang + 1):
-        fname = f"HA_{nam}_{i:02}.xlsx"
-        fname_ck = f"HA_{nam - 1}_{i:02}.xlsx"
-        file_id = all_files_ha.get(fname)
-        file_id_ck = all_files_ha.get(fname_ck)
-
-        if file_id:
-            df = download_excel(file_id)
-            if not df.empty and df.shape[0] >= 1:
-                try:
-                    ty_le_th = float(str(df.iloc[0, 4]).replace(",", "."))  # cột E
-                    ty_le_ck = float(str(df.iloc[0, 5]).replace(",", ".")) if df.shape[1] >= 6 else None
-                    ty_le_kh = float(str(df.iloc[0, 6]).replace(",", ".")) if df.shape[1] >= 7 else None
-
-                    df_list_th.append({"Tháng": i, "Tỷ lệ": ty_le_th})
-                    if ty_le_ck is not None:
-                        df_list_ck.append({"Tháng": i, "Tỷ lệ": ty_le_ck})
-                    if ty_le_kh is not None:
-                        df_list_kh.append({"Tháng": i, "Tỷ lệ": ty_le_kh})
-                except:
-                    st.warning(f"Lỗi đọc file: {fname}")
-
-    df_th = pd.DataFrame(df_list_th)
-    df_ck = pd.DataFrame(df_list_ck)
-    df_kh = pd.DataFrame(df_list_kh)
-
-    if not df_th.empty:
-        fig, ax = plt.subplots(figsize=(6, 3), dpi=150)
-
-        ax.plot(df_th["Tháng"], df_th["Tỷ lệ"], marker='o', color='blue', label='Thực hiện', linewidth=1)
-        if not df_ck.empty:
-            ax.plot(df_ck["Tháng"], df_ck["Tỷ lệ"], marker='o', color='orange', label='Cùng kỳ', linewidth=1)
-        if not df_kh.empty:
-            ax.plot(df_kh["Tháng"], df_kh["Tỷ lệ"], marker='o', color='gray', label='Kế hoạch', linewidth=1)
-
-        for i, v in enumerate(df_th["Tỷ lệ"]):
-            ax.text(df_th["Tháng"].iloc[i], v + 0.05, f"{v:.2f}", ha='center', fontsize=6, color='black')
-
-        ax.set_ylabel("Tỷ lệ (%)", fontsize=8, color='black')
-        ax.set_xlabel("Tháng", fontsize=8, color='black')
-        ax.tick_params(axis='both', colors='black', labelsize=6)
-        ax.grid(True, linestyle='--', linewidth=0.5)
-        ax.set_title("Biểu đồ tỷ lệ tổn thất hạ thế", fontsize=10, color='black')
-        ax.legend(fontsize=6)
-
-        st.pyplot(fig)
-        st.dataframe(df_th)
-
+    st.info("Nội dung phân tích mới cho tổn thất hạ thế sẽ được viết tại đây.")
+    if st.session_state.df_ha_thang is not None:
+        st.dataframe(st.session_state.df_ha_thang)
     else:
-        st.warning("Không có dữ liệu phù hợp để hiển thị.")
+        st.warning("Chưa có dữ liệu tổn thất hạ thế để hiển thị.")
+
+
 with st.expander("⚡ Tổn thất trung thế (TBA Trung thế)"):
     st.header("Phân tích dữ liệu TBA Trung áp (Trung thế)")
     st.info("Nội dung phân tích mới cho TBA Trung thế sẽ được viết tại đây.")
