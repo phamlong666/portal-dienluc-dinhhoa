@@ -289,47 +289,44 @@ with st.expander("⚡ Tổn thất hạ thế"):
     nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="ha_nam")
     thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="ha_thang")
 
-    # Thực hiện
     df_list = []
-    for fname in all_files_ha:
-        if f"HA_{nam}_" in fname:
-            try:
-                month = int(fname.split("_")[2].split(".")[0])
-                if month <= thang:
-                    file_id = all_files_ha.get(fname)
-                    df = download_excel(file_id)
-                    if not df.empty and df.shape[0] >= 1:
-                        ty_le = float(str(df.iloc[0, 4]).replace(",", "."))
-                        df_list.append({"Tháng": month, "Tỷ lệ": ty_le})
-            except:
-                st.warning(f"Lỗi đọc file: {fname}")
+    df_list_ck = []
+    df_list_kh = []
+
+    for i in range(1, thang + 1):
+        fname = f"HA_{nam}_{i:02}.xlsx"
+        fname_ck = f"HA_{nam - 1}_{i:02}.xlsx"
+        file_id = all_files_ha.get(fname)
+        file_id_ck = all_files_ha.get(fname_ck)
+
+        if file_id:
+            df = download_excel(file_id)
+            if not df.empty and df.shape[0] >= 1:
+                try:
+                    ty_le_th = float(str(df.iloc[0, 4]).replace(",", "."))  # Thực hiện (cột E)
+                    ty_le_ck = float(str(df.iloc[0, 5]).replace(",", ".")) if df.shape[1] >= 6 else None  # Cùng kỳ (cột F nếu có)
+                    ty_le_kh = float(str(df.iloc[0, 6]).replace(",", ".")) if df.shape[1] >= 7 else None  # Kế hoạch (cột G nếu có)
+
+                    df_list.append({"Tháng": i, "Tỷ lệ": ty_le_th})
+                    if ty_le_ck is not None:
+                        df_list_ck.append({"Tháng": i, "Tỷ lệ": ty_le_ck})
+                    if ty_le_kh is not None:
+                        df_list_kh.append({"Tháng": i, "Tỷ lệ": ty_le_kh})
+                except:
+                    st.warning(f"Lỗi đọc dữ liệu file: {fname}")
 
     df_th = pd.DataFrame(df_list).sort_values("Tháng")
-
-    # Cùng kỳ
-    nam_ck = nam - 1
-    df_list_ck = []
-    for fname in all_files_ha:
-        if f"HA_{nam_ck}_" in fname:
-            try:
-                month = int(fname.split("_")[2].split(".")[0])
-                if month <= thang:
-                    file_id = all_files_ha.get(fname)
-                    df = download_excel(file_id)
-                    if not df.empty and df.shape[0] >= 1:
-                        ty_le = float(str(df.iloc[0, 4]).replace(",", "."))
-                        df_list_ck.append({"Tháng": month, "Tỷ lệ": ty_le})
-            except:
-                pass
-
-    df_ck = pd.DataFrame(df_list_ck).sort_values("Tháng")
+    df_ck = pd.DataFrame(df_list_ck).sort_values("Tháng") if df_list_ck else pd.DataFrame()
+    df_kh = pd.DataFrame(df_list_kh).sort_values("Tháng") if df_list_kh else pd.DataFrame()
 
     if not df_th.empty:
-        fig, ax = plt.subplots(figsize=(3, 1.5), dpi=150)
+        fig, ax = plt.subplots(figsize=(6, 3), dpi=150)
 
-        ax.plot(df_th["Tháng"], df_th["Tỷ lệ"], marker='o', color='black', label='Thực hiện', linewidth=1)
+        ax.plot(df_th["Tháng"], df_th["Tỷ lệ"], marker='o', color='blue', label='Thực hiện', linewidth=1)
         if not df_ck.empty:
             ax.plot(df_ck["Tháng"], df_ck["Tỷ lệ"], marker='o', color='orange', label='Cùng kỳ', linewidth=1)
+        if not df_kh.empty:
+            ax.plot(df_kh["Tháng"], df_kh["Tỷ lệ"], marker='o', color='gray', label='Kế hoạch', linewidth=1)
 
         for i, v in enumerate(df_th["Tỷ lệ"]):
             ax.text(df_th["Tháng"].iloc[i], v + 0.05, f"{v:.2f}", ha='center', fontsize=6, color='black')
@@ -338,7 +335,7 @@ with st.expander("⚡ Tổn thất hạ thế"):
         ax.set_xlabel("Tháng", fontsize=8, color='black')
         ax.tick_params(axis='both', colors='black', labelsize=6)
         ax.grid(True, linestyle='--', linewidth=0.5)
-        ax.set_title("Biểu đồ tỷ lệ tổn thất hạ thế", fontsize=9, color='black')
+        ax.set_title("Biểu đồ tỷ lệ tổn thất hạ thế", fontsize=10, color='black')
         ax.legend(fontsize=6)
 
         st.pyplot(fig)
