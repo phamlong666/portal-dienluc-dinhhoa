@@ -568,11 +568,10 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
                             ax.text(bar.get_x() + bar.get_width()/2, height + 0.2, f"{height:.2f}", ha='center', fontsize=7)
             else:
                 for col in pivot_df.columns:
-                    valid_data = pivot_df[col]
-                    ax.plot(valid_data.index, valid_data.values, marker='o', label=col)
-                    for x, y in zip(valid_data.index, valid_data.values):
-                        if y > 0:
-                            ax.text(x, y + 0.2, f"{y:.2f}", ha='center', fontsize=7)
+    valid_data = pivot_df[col].replace(0, pd.NA).dropna()
+    ax.plot(valid_data.index, valid_data.values, marker='o', label=col)
+    for x, y in zip(valid_data.index, valid_data.values):
+        ax.text(x, y + 0.2, f"{y:.2f}", ha='center', fontsize=7)
                 ax.set_xticks(range(1, 13))
                 ax.set_xticklabels(range(1, 13), rotation=90)
 
