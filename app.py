@@ -552,7 +552,7 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
             else:
                 df_dd["Tổn thất (%)"] = (df_dd["Điện tổn thất"] / df_dd["Thương phẩm"] * 100).round(2)
 
-            pivot_df = df_dd.pivot(index="Tháng", columns="Kỳ", values="Tổn thất (%)")
+            pivot_df = df_dd.pivot(index="Tháng", columns="Kỳ", values="Tổn thất (%)").reindex(range(1, 13)).fillna(0)
 
             st.write(f"### Biểu đồ tỷ lệ tổn thất - Đường dây {dd}")
 
@@ -568,11 +568,13 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
                             ax.text(bar.get_x() + bar.get_width()/2, height + 0.2, f"{height:.2f}", ha='center', fontsize=7)
             else:
                 for col in pivot_df.columns:
-                    valid_data = pivot_df[col].dropna()
+                    valid_data = pivot_df[col]
                     ax.plot(valid_data.index, valid_data.values, marker='o', label=col)
-                    for i, v in enumerate(valid_data.values):
-                        if v > 0:
-                            ax.text(valid_data.index[i], v + 0.2, f"{v:.2f}", ha='center', fontsize=7)
+                    for x, y in zip(valid_data.index, valid_data.values):
+                        if y > 0:
+                            ax.text(x, y + 0.2, f"{y:.2f}", ha='center', fontsize=7)
+                ax.set_xticks(range(1, 13))
+                ax.set_xticklabels(range(1, 13), rotation=90)
 
             ax.set_xlabel("Tháng")
             ax.set_ylabel("Tổn thất (%)")
