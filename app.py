@@ -8,10 +8,9 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
-# --- Các đoạn code và expander gốc ---
-# (Đưa đầy đủ code gốc của anh vào đây, không chỉ placeholder)
+st.set_page_config(layout="wide", page_title="Báo cáo tổn thất TBA")
+st.title("📥 AI_Trợ lý tổn thất")
 
-# --- Bổ sung đầy đủ hàm get_drive_service để tránh lỗi NameError ---
 FOLDER_ID = '165Txi8IyqG50uFSFHzWidSZSG9qpsbaq'
 
 @st.cache_data
@@ -23,11 +22,11 @@ def get_drive_service():
         )
         return build('drive', 'v3', credentials=credentials)
     except Exception as e:
-        st.error(f"Lỗi khi xác thực Google Drive: {e}.")
+        st.error(f"Lỗi xác thực Google Drive: {e}")
         return None
 
 @st.cache_data
-def download_excel(file_id):
+def download_excel(file_id, sheet_name="Sheet1"):
     service = get_drive_service()
     if not service:
         return pd.DataFrame()
@@ -39,15 +38,15 @@ def download_excel(file_id):
         while not done:
             status, done = downloader.next_chunk()
         fh.seek(0)
-        return pd.read_excel(fh, sheet_name="dữ liệu")
+        return pd.read_excel(fh, sheet_name=sheet_name)
     except Exception as e:
-        st.warning(f"Không thể tải hoặc đọc file: {e}.")
+        st.warning(f"Không thể tải hoặc đọc file: {e}")
         return pd.DataFrame()
 
 # --- 🔌 Tổn thất các TBA công cộng ---
 with st.expander("🔌 Tổn thất các TBA công cộng"):
     st.header("Phân tích dữ liệu TBA công cộng")
-    # Đưa nguyên code gốc TBA công cộng của anh đã test chạy tốt vào đây
+    st.write("(Đưa lại toàn bộ code TBA công cộng gốc của anh Long tại đây)")
 
 # --- ⚡ Tổn thất hạ thế ---
 with st.expander("⚡ Tổn thất hạ thế"):
@@ -64,7 +63,7 @@ with st.expander("⚡ Tổn thất hạ thế"):
             results = service.files().list(q=query, fields="files(id, name)").execute()
             return {f['name']: f['id'] for f in results.get('files', [])}
         except Exception as e:
-            st.error(f"Lỗi khi liệt kê file hạ thế: {e}.")
+            st.error(f"Lỗi liệt kê file: {e}")
             return {}
 
     all_files_ha = list_excel_files_ha()
@@ -76,41 +75,44 @@ with st.expander("⚡ Tổn thất hạ thế"):
     selected_file = st.selectbox("Chọn file dữ liệu hạ thế", list(all_files_ha.keys()))
 
     if selected_file:
-        df_ha = download_excel(all_files_ha[selected_file])
+        # Chú ý: kiểm tra tên sheet thật sự trong file, có thể không phải 'dữ liệu'
+        df_ha = download_excel(all_files_ha[selected_file], sheet_name=0)
 
         if not df_ha.empty:
-            x = df_ha['Tháng']
-            y_th = df_ha['Thực hiện']
-            y_ck = df_ha['Cùng kỳ']
-            y_kh = df_ha['Kế hoạch']
+            if 'Tháng' in df_ha.columns and 'Thực hiện' in df_ha.columns and 'Cùng kỳ' in df_ha.columns and 'Kế hoạch' in df_ha.columns:
+                x = df_ha['Tháng']
+                y_th = df_ha['Thực hiện']
+                y_ck = df_ha['Cùng kỳ']
+                y_kh = df_ha['Kế hoạch']
 
-            fig, ax = plt.subplots(figsize=(8, 4))
-            ax.plot(x, y_th, marker='o', label='Thực hiện', color='blue')
-            ax.plot(x, y_ck, marker='o', label='Cùng kỳ', color='orange')
-            ax.plot(x, y_kh, marker='o', label='Kế hoạch', color='gray')
+                fig, ax = plt.subplots(figsize=(8, 4))
+                ax.plot(x, y_th, marker='o', label='Thực hiện', color='blue')
+                ax.plot(x, y_ck, marker='o', label='Cùng kỳ', color='orange')
+                ax.plot(x, y_kh, marker='o', label='Kế hoạch', color='gray')
 
-            for i, v in enumerate(y_th):
-                ax.text(x[i], v + 0.02, f"{v:.2f}", ha='center', fontsize=8)
+                for i, v in enumerate(y_th):
+                    ax.text(x[i], v + 0.02, f"{v:.2f}", ha='center', fontsize=8)
 
-            ax.set_ylabel("Tỷ lệ (%)")
-            ax.set_xlabel("Tháng")
-            ax.legend()
-            ax.grid(True, linestyle='--', linewidth=0.5)
-            ax.set_title("Biểu đồ tỷ lệ tổn thất hạ thế")
+                ax.set_ylabel("Tỷ lệ (%)")
+                ax.set_xlabel("Tháng")
+                ax.legend()
+                ax.grid(True, linestyle='--', linewidth=0.5)
+                ax.set_title("Biểu đồ tỷ lệ tổn thất hạ thế")
 
-            st.pyplot(fig)
+                st.pyplot(fig)
 
-            tile = f"### Tỷ lệ tổn thất: {y_th.iloc[-1]:.2f}%"
-            st.markdown(tile)
+                tile = f"### Tỷ lệ tổn thất: {y_th.iloc[-1]:.2f}%"
+                st.markdown(tile)
 
-            diff_ck = y_th.iloc[-1] - y_ck.iloc[-1]
-            diff_kh = y_th.iloc[-1] - y_kh.iloc[-1]
+                diff_ck = y_th.iloc[-1] - y_ck.iloc[-1]
+                diff_kh = y_th.iloc[-1] - y_kh.iloc[-1]
 
-            st.write(f"So với cùng kỳ: {y_ck.iloc[-1]:.2f}% (chênh {diff_ck:+.2f}%)")
-            st.write(f"So với kế hoạch: {y_kh.iloc[-1]:.2f}% (chênh {diff_kh:+.2f}%)")
+                st.write(f"So với cùng kỳ: {y_ck.iloc[-1]:.2f}% (chênh {diff_ck:+.2f}%)")
+                st.write(f"So với kế hoạch: {y_kh.iloc[-1]:.2f}% (chênh {diff_kh:+.2f}%)")
 
-            st.dataframe(df_ha)
-
+                st.dataframe(df_ha)
+            else:
+                st.warning("File không chứa đủ cột cần thiết (Tháng, Thực hiện, Cùng kỳ, Kế hoạch).")
         else:
             st.warning("File trống hoặc không đúng định dạng.")
     else:
@@ -119,14 +121,14 @@ with st.expander("⚡ Tổn thất hạ thế"):
 # --- ⚡ Tổn thất trung thế (TBA Trung thế) ---
 with st.expander("⚡ Tổn thất trung thế (TBA Trung thế)"):
     st.header("Phân tích dữ liệu TBA Trung áp (Trung thế)")
-    # Đưa nguyên code gốc TBA Trung thế của anh vào đây
+    st.write("(Đưa code gốc TBA Trung thế vào đây)")
 
 # --- ⚡ Tổn thất các đường dây trung thế ---
 with st.expander("⚡ Tổn thất các đường dây trung thế"):
     st.header("Phân tích dữ liệu tổn thất Đường dây Trung thế")
-    # Đưa nguyên code gốc Đường dây trung thế của anh vào đây
+    st.write("(Đưa code gốc đường dây trung thế vào đây)")
 
 # --- 🏢 Tổn thất toàn đơn vị ---
 with st.expander("🏢 Tổn thất toàn đơn vị"):
     st.header("Phân tích dữ liệu tổn thất Toàn đơn vị")
-    # Đưa nguyên code gốc toàn đơn vị của anh vào đây
+    st.write("(Đưa code gốc toàn đơn vị vào đây)")
