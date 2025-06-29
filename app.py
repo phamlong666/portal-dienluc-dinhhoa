@@ -465,10 +465,8 @@ with st.expander("⚡ Tổn thất trung thế"):
 
     else:
         st.warning("Không có dữ liệu phù hợp để hiển thị.")
-
-st.set_page_config(layout="wide", page_title="Báo cáo tổn thất Đường dây Trung thế")
-
-FOLDER_ID_XT = '1ESynjLXJrw8TaF3zwlQm-BR3mFf4LIi9'
+# --- Biến và Hàm Google Drive ---
+FOLDER_ID_DY = '1ESynjLXJrw8TaF3zwlQm-BR3mFf4LIi9'
 
 @st.cache_data
 def get_drive_service():
@@ -479,9 +477,9 @@ def get_drive_service():
     return build('drive', 'v3', credentials=credentials)
 
 @st.cache_data
-def list_excel_files_xt():
+def list_excel_files():
     service = get_drive_service()
-    query = f"'{FOLDER_ID_XT}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
+    query = f"'{FOLDER_ID_DY}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
     results = service.files().list(q=query, fields="files(id, name)").execute()
     return {f['name']: f['id'] for f in results.get('files', [])}
 
@@ -500,51 +498,49 @@ def download_excel(file_id):
 with st.expander("⚡ Tổn thất các đường dây trung thế"):
     st.header("Phân tích dữ liệu tổn thất Đường dây Trung thế")
 
-    all_files_xt = list_excel_files_xt()
+    all_files = list_excel_files()
+    file_names = list(all_files.keys())
 
-    nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="xt_nam")
-    thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="xt_thang")
+    selected_files = st.multiselect("Chọn file từ Google Drive", file_names)
 
-    fname = f"XT_{nam}_{thang:02}.xlsx"
-    file_id = all_files_xt.get(fname)
+    if selected_files:
+        data_list = []
+        for fname in selected_files:
+            file_id = all_files[fname]
+            df = download_excel(file_id)
 
-    if file_id:
-        df = download_excel(file_id)
+            ten_dd = df.iloc[0, 1]
+            ton_that = df.iloc[0, 6]
+            thuong_pham = df.iloc[0, 2]
+            dien_ton_that = df.iloc[0, 5]
 
-        if not df.empty and df.shape[0] >= 4:
-            try:
-                ten_dd = df.iloc[:4, 1].tolist()
-                ton_that = df.iloc[:4, 6].astype(str).str.replace(",", ".").astype(float).tolist()
-                thuong_pham = df.iloc[:4, 2].astype(str).str.replace(",", ".").astype(float).tolist()
-                ton_that_lk = df.iloc[:4, 5].astype(str).str.replace(",", ".").astype(float).tolist()
+            data_list.append({
+                "Đường dây": ten_dd,
+                "Tổn thất": ton_that,
+                "Thương phẩm": thuong_pham,
+                "Điện tổn thất": dien_ton_that
+            })
 
-                ty_le = [(tt / tp * 100) if tp > 0 else 0 for tt, tp in zip(ton_that, thuong_pham)]
+        df_all = pd.DataFrame(data_list)
 
-                tong_ton_that_lk = sum(ton_that_lk)
-                tong_thuong_pham = sum(thuong_pham)
-                ty_le_luy_ke = (tong_ton_that_lk / tong_thuong_pham) * 100 if tong_thuong_pham > 0 else 0
+        tong_dien_ton_that = df_all["Điện tổn thất"].sum()
+        tong_thuong_pham = df_all["Thương phẩm"].sum()
+        ty_le_luy_ke = (tong_dien_ton_that / tong_thuong_pham) * 100 if tong_thuong_pham > 0 else 0
 
-                fig, ax = plt.subplots(figsize=(6, 4), dpi=300)
-                bars = ax.bar(ten_dd, ty_le)
+        st.write("### Bảng dữ liệu tổng hợp")
+        st.dataframe(df_all, use_container_width=True)
 
-                colors = plt.cm.tab10.colors
-                for i, bar in enumerate(bars):
-                    bar.set_color(colors[i % len(colors)])
-                    ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5, f"{bar.get_height():.2f}%", 
-                            ha='center', fontsize=7, color='black')
+        st.write(f"**Tỷ lệ lũy kế (theo công thức): {ty_le_luy_ke:.2f}%**")
 
-                ax.set_ylabel("Tỷ lệ tổn thất (%)", fontsize=9)
-                ax.set_title(f"Tổn thất các đường dây (Lũy kế: {ty_le_luy_ke:.2f}%)", fontsize=10, weight='bold')
-                ax.tick_params(axis='x', rotation=15, labelsize=7)
-                ax.grid(axis='y', linestyle='--', linewidth=0.5, alpha=0.7)
+        fig, ax = plt.subplots(figsize=(8, 4), dpi=200)
+        ax.bar(df_all["Đường dây"], df_all["Tổn thất"], color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
+        ax.set_ylabel("Tổn thất")
+        ax.set_title("Biểu đồ tổn thất theo từng đường dây")
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
 
-                st.pyplot(fig)
-                st.dataframe(df.iloc[:4, [1, 2, 5, 6]].rename(columns={df.columns[1]: "Tên ĐD", df.columns[2]: "Thương phẩm", df.columns[5]: "Tổng TT LK", df.columns[6]: "TT Tháng"}))
+        for i, v in enumerate(df_all["Tổn thất"]):
+            ax.text(i, v + 0.5, f"{v:.2f}", ha='center', fontsize=8)
 
-            except Exception as e:
-                st.warning(f"Lỗi xử lý dữ liệu: {e}")
-        else:
-            st.warning("Không đủ dữ liệu (phải có ít nhất 4 đường dây).")
+        st.pyplot(fig)
     else:
-        st.warning(f"Không tìm thấy file: {fname} trên Google Drive.")
-
+        st.info("Vui lòng chọn file từ Google Drive để hiển thị dữ liệu.")
