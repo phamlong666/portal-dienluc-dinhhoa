@@ -466,15 +466,50 @@ with st.expander("⚡ Tổn thất trung thế"):
     else:
         st.warning("Không có dữ liệu phù hợp để hiển thị.")
 
+st.set_page_config(layout="wide", page_title="Báo cáo tổn thất Đường dây Trung thế")
+st.title("📥 AI_Trợ lý tổn thất")
+
+FOLDER_ID_XT = '1ESynjLXJrw8TaF3zwlQm-BR3mFf4LIi9'
+
+@st.cache_data
+def get_drive_service():
+    credentials = service_account.Credentials.from_service_account_info(
+        st.secrets["google"],
+        scopes=["https://www.googleapis.com/auth/drive.readonly"]
+    )
+    return build('drive', 'v3', credentials=credentials)
+
+@st.cache_data
+def list_excel_files_xt():
+    service = get_drive_service()
+    query = f"'{FOLDER_ID_XT}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
+    results = service.files().list(q=query, fields="files(id, name)").execute()
+    return {f['name']: f['id'] for f in results.get('files', [])}
+
+@st.cache_data
+def download_excel(file_id):
+    service = get_drive_service()
+    request = service.files().get_media(fileId=file_id)
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+    fh.seek(0)
+    return pd.read_excel(fh, sheet_name=0)
+
 with st.expander("⚡ Tổn thất các đường dây trung thế"):
     st.header("Phân tích dữ liệu tổn thất Đường dây Trung thế")
 
     nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="xt_nam")
     thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="xt_thang")
 
-    file_path = f"./XT_{nam}_{thang:02}.xlsx"
-    if os.path.exists(file_path):
-        df = pd.read_excel(file_path)
+    all_files_xt = list_excel_files_xt()
+    fname = f"XT_{nam}_{thang:02}.xlsx"
+    file_id = all_files_xt.get(fname)
+
+    if file_id:
+        df = download_excel(file_id)
 
         if not df.empty and df.shape[0] >= 4:
             try:
@@ -511,4 +546,4 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
         else:
             st.warning("Không đủ dữ liệu (phải có ít nhất 4 đường dây).")
     else:
-        st.warning(f"Không tìm thấy file: {file_path}")
+        st.warning(f"Không tìm thấy file: {fname} trên Google Drive.")
