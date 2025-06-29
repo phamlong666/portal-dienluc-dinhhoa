@@ -503,7 +503,6 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
 
     all_years = sorted({int(fname.split("_")[1]) for fname in all_files.keys() if "_" in fname})
     selected_year = st.selectbox("Chọn năm", all_years)
-    selected_month = st.selectbox("Chọn tháng", list(range(1, 13)))
 
     include_cungkỳ = st.checkbox("So sánh cùng kỳ năm trước", value=True)
     mode = st.radio("Chọn chế độ báo cáo", ["Tháng", "Lũy kế"], horizontal=True)
@@ -518,7 +517,7 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
         except:
             continue
 
-        if (year == selected_year and month == selected_month) or (include_cungkỳ and year == selected_year - 1 and month == selected_month):
+        if year == selected_year or (include_cungkỳ and year == selected_year - 1):
             df = download_excel(file_id)
 
             for idx, row in df.iterrows():
@@ -587,5 +586,5 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
             st.pyplot(fig, use_container_width=True)
 
     else:
-        st.warning("Không có dữ liệu để hiển thị cho năm và tháng đã chọn.")
+        st.warning("Không có dữ liệu để hiển thị cho năm đã chọn.")
 
