@@ -514,7 +514,8 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
                 ax.set_title(
                     f"Biểu đồ tỷ lệ tổn thất các đường dây
 Lũy kế: {ty_le_luy_ke:.2f}%",
-                    fontsize=9, color='black'
+                    fontsize=9,
+                    color='black'
                 )
                 ax.tick_params(axis='x', rotation=15, labelsize=6)
                 ax.grid(True, linestyle='--', linewidth=0.3, alpha=0.7)
