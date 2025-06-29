@@ -465,7 +465,6 @@ with st.expander("⚡ Tổn thất trung thế"):
 
     else:
         st.warning("Không có dữ liệu phù hợp để hiển thị.")
-# --- Biến và Hàm Google Drive ---
 FOLDER_ID_DY = '1ESynjLXJrw8TaF3zwlQm-BR3mFf4LIi9'
 
 @st.cache_data
