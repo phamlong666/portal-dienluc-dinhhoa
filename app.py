@@ -501,65 +501,71 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
 
     all_files = list_excel_files()
 
-    mode = st.radio("Chọn chế độ báo cáo", ["Tháng", "Lũy kế"], horizontal=True)
-
-    available_months = sorted({int(fname.split("_")[2].split(".")[0]) for fname in all_files.keys() if "_" in fname})
-    selected_month = st.selectbox("Chọn tháng", available_months)
+    selected_year = st.selectbox("Chọn năm", sorted({int(fname.split("_")[1]) for fname in all_files.keys() if "_" in fname}))
+    include_cungkỳ = st.checkbox("So sánh cùng kỳ năm trước", value=True)
+    chart_type = st.radio("Chọn kiểu biểu đồ", ["Cột", "Đường line"], horizontal=True)
 
     data_list = []
+
     for fname, file_id in all_files.items():
-        month_str = fname.split("_")[2].split(".")[0]
         try:
-            month = int(month_str)
+            year = int(fname.split("_")[1])
+            month = int(fname.split("_")[2].split(".")[0])
         except:
             continue
 
-        if month != selected_month:
-            continue
+        if year == selected_year or (include_cungkỳ and year == selected_year - 1):
+            df = download_excel(file_id)
 
-        df = download_excel(file_id)
+            for idx, row in df.iterrows():
+                ten_dd = str(row.iloc[1]).strip()
+                ton_that = row.iloc[6]
+                ky = "Cùng kỳ" if year == selected_year - 1 else "Thực hiện"
 
-        for idx, row in df.iterrows():
-            ten_dd = row.iloc[1]
-            ton_that = row.iloc[6]
-            thuong_pham = row.iloc[2]
-            dien_ton_that = row.iloc[5]
-
-            data_list.append({
-                "Tháng": month,
-                "Đường dây": ten_dd,
-                "Tổn thất": ton_that,
-                "Thương phẩm": thuong_pham,
-                "Điện tổn thất": dien_ton_that
-            })
+                data_list.append({
+                    "Năm": year,
+                    "Tháng": month,
+                    "Đường dây": ten_dd,
+                    "Tổn thất": ton_that,
+                    "Kỳ": ky
+                })
 
     df_all = pd.DataFrame(data_list)
 
     if not df_all.empty:
-        duong_day_list = df_all["Đường dây"].unique()[:4]
-        df_all = df_all[df_all["Đường dây"].isin(duong_day_list)]
+        duong_day_list = df_all["Đường dây"].unique()
 
-        if mode == "Lũy kế":
-            df_grouped = df_all.groupby(["Tháng", "Đường dây"], as_index=False).sum()
-        else:
-            df_grouped = df_all.groupby(["Tháng", "Đường dây"], as_index=False).mean()
+        for dd in duong_day_list:
+            df_dd = df_all[df_all["Đường dây"] == dd]
 
-        df_grouped = df_grouped.drop_duplicates(subset=["Tháng", "Đường dây"])
+            pivot_df = df_dd.pivot(index="Tháng", columns="Kỳ", values="Tổn thất").reindex(range(1, 13)).fillna(0)
 
-        pivot_df = df_grouped.pivot(index="Tháng", columns="Đường dây", values="Tổn thất").fillna(0)
+            st.write(f"### Biểu đồ tổn thất 12 tháng - Đường dây {dd}")
 
-        st.write("### Biểu đồ tổn thất đường dây trong tháng đã chọn")
+            fig, ax = plt.subplots(figsize=(10, 4), dpi=150)
 
-        fig, ax = plt.subplots(figsize=(8, 4), dpi=150)  # ✅ Co nhỏ khung hình lại để nhìn rõ hơn
+            if chart_type == "Cột":
+                pivot_df.plot(kind="bar", ax=ax)
+                for container in ax.containers:
+                    for bar in container:
+                        height = bar.get_height()
+                        if height > 0:
+                            ax.text(bar.get_x() + bar.get_width()/2, height + 0.2, f"{height:.2f}", ha='center', fontsize=7)
+            else:
+                for col in pivot_df.columns:
+                    ax.plot(pivot_df.index, pivot_df[col], marker='o', label=col)
+                    for i, v in enumerate(pivot_df[col]):
+                        if v > 0:
+                            ax.text(pivot_df.index[i], v + 0.2, f"{v:.2f}", ha='center', fontsize=7)
 
-        pivot_df.plot(kind="bar", ax=ax)
-        ax.set_xlabel("Tháng")
-        ax.set_ylabel("Tổn thất")
-        ax.set_title(f"Biểu đồ tổn thất - Tháng {selected_month}")
-        ax.grid(axis='y', linestyle='--', alpha=0.7)
+            ax.set_xlabel("Tháng")
+            ax.set_ylabel("Tổn thất")
+            ax.set_title(f"Đường dây {dd} - Năm {selected_year}")
+            ax.legend()
+            ax.grid(axis='y', linestyle='--', alpha=0.7)
+            ax.set_xticks(range(1, 13))
 
-        plt.xticks(rotation=0)
+            st.pyplot(fig, use_container_width=True)
 
-        st.pyplot(fig, use_container_width=True)
     else:
-        st.warning("Không có dữ liệu để hiển thị cho tháng đã chọn.")
+        st.warning("Không có dữ liệu để hiển thị cho năm đã chọn.")
