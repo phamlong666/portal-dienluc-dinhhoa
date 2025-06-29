@@ -87,7 +87,7 @@ def download_excel(file_id):
             status, done = downloader.next_chunk()
             # st.progress(status.progress()) # Có thể thêm thanh tiến trình
         fh.seek(0)
-        return pd.read_excel(fh, sheet_name="dữ liệu")
+        return pd.read_excel(fh, sheet_name=0)
     except Exception as e:
         st.warning(f"Không thể tải xuống hoặc đọc file với ID {file_id}. Lỗi: {e}. Có thể file không tồn tại hoặc không đúng định dạng sheet 'dữ liệu'.")
         return pd.DataFrame()
