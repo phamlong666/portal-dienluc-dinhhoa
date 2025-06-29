@@ -502,11 +502,8 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
     all_files = list_excel_files()
 
     all_years = sorted({int(fname.split("_")[1]) for fname in all_files.keys() if "_" in fname})
-    all_months = sorted({int(fname.split("_")[2].split(".")[0]) for fname in all_files.keys() if "_" in fname})
 
     selected_year = st.selectbox("Chọn năm", all_years)
-    selected_month = st.selectbox("Chọn tháng (0 = tất cả)", [0] + all_months)
-
     include_cungkỳ = st.checkbox("So sánh cùng kỳ năm trước", value=True)
     mode = st.radio("Chọn chế độ báo cáo", ["Tháng", "Lũy kế"], horizontal=True)
     chart_type = st.radio("Chọn kiểu biểu đồ", ["Cột", "Đường line"], horizontal=True)
@@ -520,7 +517,7 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
         except:
             continue
 
-        if (year == selected_year and (selected_month == 0 or month == selected_month)) or (include_cungkỳ and year == selected_year - 1 and (selected_month == 0 or month == selected_month)):
+        if year == selected_year or (include_cungkỳ and year == selected_year - 1):
             df = download_excel(file_id)
 
             for idx, row in df.iterrows():
@@ -549,21 +546,21 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
             df_dd = df_dd.sort_values("Tháng")
 
             if mode == "Lũy kế":
-                df_dd["Lũy kế Điện tổn thất"] = df_dd.groupby(["Kỳ"])["Điện tổn thất"].cumsum()
-                df_dd["Lũy kế Thương phẩm"] = df_dd.groupby(["Kỳ"])["Thương phẩm"].cumsum()
-                df_dd["Tổn thất (%)"] = (df_dd["Lũy kế Điện tổn thất"] / df_dd["Lũy kế Thương phẩm"] * 100).round(2)
+                df_dd["Tổng Điện tổn thất"] = df_dd.groupby(["Kỳ"])["Điện tổn thất"].cumsum()
+                df_dd["Tổng Thương phẩm"] = df_dd.groupby(["Kỳ"])["Thương phẩm"].cumsum()
+                df_dd["Tổn thất (%)"] = (df_dd["Tổng Điện tổn thất"] / df_dd["Tổng Thương phẩm"] * 100).round(2)
             else:
                 df_dd["Tổn thất (%)"] = (df_dd["Điện tổn thất"] / df_dd["Thương phẩm"] * 100).round(2)
 
-            pivot_df = df_dd.pivot(index="Tháng", columns="Kỳ", values="Tổn thất (%)").reindex(range(1, 13)).fillna(0)
+            pivot_df = df_dd.pivot(index="Tháng", columns="Kỳ", values="Tổn thất (%)")
 
-            st.write(f"### Biểu đồ tỷ lệ tổn thất 12 tháng - Đường dây {dd}")
+            st.write(f"### Biểu đồ tỷ lệ tổn thất - Đường dây {dd}")
 
             fig, ax = plt.subplots(figsize=(10, 4), dpi=150)
 
             if chart_type == "Cột":
                 pivot_df.plot(kind="bar", ax=ax)
-                ax.set_xticklabels(pivot_df.index, rotation=45, ha='right')  # ✅ Xoay chữ số trục hoành
+                ax.set_xticklabels(pivot_df.index, rotation=90, ha='center')
                 for container in ax.containers:
                     for bar in container:
                         height = bar.get_height()
@@ -571,19 +568,20 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
                             ax.text(bar.get_x() + bar.get_width()/2, height + 0.2, f"{height:.2f}", ha='center', fontsize=7)
             else:
                 for col in pivot_df.columns:
-                    ax.plot(pivot_df.index, pivot_df[col], marker='o', label=col)
-                    for i, v in enumerate(pivot_df[col]):
+                    valid_data = pivot_df[col].dropna()
+                    ax.plot(valid_data.index, valid_data.values, marker='o', label=col)
+                    for i, v in enumerate(valid_data.values):
                         if v > 0:
-                            ax.text(pivot_df.index[i], v + 0.2, f"{v:.2f}", ha='center', fontsize=7)
+                            ax.text(valid_data.index[i], v + 0.2, f"{v:.2f}", ha='center', fontsize=7)
 
             ax.set_xlabel("Tháng")
             ax.set_ylabel("Tổn thất (%)")
             ax.set_title(f"Đường dây {dd} - Năm {selected_year}")
             ax.legend()
             ax.grid(axis='y', linestyle='--', alpha=0.7)
-            ax.set_xticks(range(1, 13))
 
             st.pyplot(fig, use_container_width=True)
 
     else:
-        st.warning("Không có dữ liệu để hiển thị cho năm và tháng đã chọn.")
+        st.warning("Không có dữ liệu để hiển thị cho năm đã chọn.")
+
