@@ -265,40 +265,6 @@ with st.expander("🔌 Tổn thất các TBA công cộng"):
     else:
         st.warning("Không có dữ liệu phù hợp để hiển thị biểu đồ. Vui lòng kiểm tra các file Excel trên Google Drive và định dạng của chúng (cần cột 'Tỷ lệ tổn thất').")
 
-with st.expander("⚡ Tổn thất hạ thế"):
-    st.header("Phân tích dữ liệu tổn thất hạ thế")
-    st.info("Nội dung phân tích mới cho tổn thất hạ thế sẽ được viết tại đây.")
-    if st.session_state.df_ha_thang is not None:
-        st.dataframe(st.session_state.df_ha_thang)
-    else:
-        st.warning("Chưa có dữ liệu tổn thất hạ thế để hiển thị.")
-
-
-with st.expander("⚡ Tổn thất trung thế (TBA Trung thế)"):
-    st.header("Phân tích dữ liệu TBA Trung áp (Trung thế)")
-    st.info("Nội dung phân tích mới cho TBA Trung thế sẽ được viết tại đây.")
-    if st.session_state.df_trung_thang_tt is not None:
-        st.dataframe(st.session_state.df_trung_thang_tt)
-    else:
-        st.warning("Chưa có dữ liệu TBA Trung áp (Trung thế) để hiển thị.")
-
-
-with st.expander("⚡ Tổn thất các đường dây trung thế"):
-    st.header("Phân tích dữ liệu tổn thất Đường dây Trung thế")
-    st.info("Nội dung phân tích mới cho đường dây trung thế sẽ được viết tại đây.")
-    if st.session_state.df_trung_thang_dy is not None:
-        st.dataframe(st.session_state.df_trung_thang_dy)
-    else:
-        st.warning("Chưa có dữ liệu tổn thất Đường dây Trung thế để hiển thị.")
-
-
-with st.expander("🏢 Tổn thất toàn đơn vị"):
-    st.header("Phân tích dữ liệu tổn thất Toàn đơn vị")
-    st.info("Nội dung phân tích mới cho toàn đơn vị sẽ được viết tại đây.")
-    if st.session_state.df_dv_thang is not None:
-        st.dataframe(st.session_state.df_dv_thang)
-    else:
-        st.warning("Chưa có dữ liệu tổn thất Toàn đơn vị để hiển thị.")
 
 with st.expander("⚡ Tổn thất hạ thế"):
     st.header("Phân tích dữ liệu tổn thất hạ thế")
@@ -323,27 +289,24 @@ with st.expander("⚡ Tổn thất hạ thế"):
     loai_bc = st.radio("Loại báo cáo", ["Tháng", "Lũy kế"], index=0, key="ha_loai_bc")
     thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="ha_thang")
 
-    selected_files = [f for f in all_files_ha if f"HA_{nam}_" in f]
-    selected_files.sort()
-
     df_list = []
-    for fname in selected_files:
-        month = int(fname.split("_")[2].split(".")[0])
-        if month <= thang:
-            file_id = all_files_ha.get(fname)
-            if file_id:
-                df = download_excel(file_id)
-                if not df.empty and df.shape[0] >= 1:
-                    try:
+    for fname in all_files_ha:
+        if f"HA_{nam}_" in fname:
+            try:
+                month = int(fname.split("_")[2].split(".")[0])
+                if month <= thang:
+                    file_id = all_files_ha.get(fname)
+                    df = download_excel(file_id)
+                    if not df.empty and df.shape[0] >= 1:
                         ty_le = float(str(df.iloc[0, 4]).replace(",", "."))  # Cột E
                         ton_that = float(str(df.iloc[0, 3]).replace(",", "."))  # Cột D
                         thuong_pham = float(str(df.iloc[0, 1]).replace(",", "."))  # Cột B
                         df_list.append({"Tháng": month, "Tỷ lệ": ty_le, "Tổn thất": ton_that, "Thương phẩm": thuong_pham})
-                    except:
-                        st.warning(f"Lỗi đọc file: {fname}")
+            except:
+                st.warning(f"Lỗi đọc file: {fname}")
 
     df_final = pd.DataFrame(df_list)
-    df_final = df_final.sort_values("Tháng")
+    df_final = df_final.sort_values("Tháng") if not df_final.empty and "Tháng" in df_final.columns else df_final
 
     if not df_final.empty:
         if loai_bc == "Lũy kế":
@@ -371,3 +334,28 @@ with st.expander("⚡ Tổn thất hạ thế"):
 
     else:
         st.warning("Không có dữ liệu phù hợp để hiển thị.")
+with st.expander("⚡ Tổn thất trung thế (TBA Trung thế)"):
+    st.header("Phân tích dữ liệu TBA Trung áp (Trung thế)")
+    st.info("Nội dung phân tích mới cho TBA Trung thế sẽ được viết tại đây.")
+    if st.session_state.df_trung_thang_tt is not None:
+        st.dataframe(st.session_state.df_trung_thang_tt)
+    else:
+        st.warning("Chưa có dữ liệu TBA Trung áp (Trung thế) để hiển thị.")
+
+
+with st.expander("⚡ Tổn thất các đường dây trung thế"):
+    st.header("Phân tích dữ liệu tổn thất Đường dây Trung thế")
+    st.info("Nội dung phân tích mới cho đường dây trung thế sẽ được viết tại đây.")
+    if st.session_state.df_trung_thang_dy is not None:
+        st.dataframe(st.session_state.df_trung_thang_dy)
+    else:
+        st.warning("Chưa có dữ liệu tổn thất Đường dây Trung thế để hiển thị.")
+
+
+with st.expander("🏢 Tổn thất toàn đơn vị"):
+    st.header("Phân tích dữ liệu tổn thất Toàn đơn vị")
+    st.info("Nội dung phân tích mới cho toàn đơn vị sẽ được viết tại đây.")
+    if st.session_state.df_dv_thang is not None:
+        st.dataframe(st.session_state.df_dv_thang)
+    else:
+        st.warning("Chưa có dữ liệu tổn thất Toàn đơn vị để hiển thị.")
