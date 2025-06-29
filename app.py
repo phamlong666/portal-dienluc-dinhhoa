@@ -495,63 +495,71 @@ def download_excel(file_id):
     return pd.read_excel(fh, sheet_name=0)
 
 st.set_page_config(layout="wide", page_title="Báo cáo tổn thất Đường dây Trung thế")
-st.title("⚡ Tổn thất các đường dây trung thế")
 
-all_files = list_excel_files()
+with st.expander("⚡ Tổn thất các đường dây trung thế"):
+    st.header("Phân tích dữ liệu tổn thất đường dây trung thế")
 
-mode = st.radio("Chọn chế độ báo cáo", ["Tháng", "Lũy kế"], horizontal=True)
+    all_files = list_excel_files()
 
-data_list = []
-for fname, file_id in all_files.items():
-    df = download_excel(file_id)
-    month_str = fname.split("_")[2].split(".")[0]
-    try:
-        month = int(month_str)
-    except:
-        continue
+    mode = st.radio("Chọn chế độ báo cáo", ["Tháng", "Lũy kế"], horizontal=True)
 
-    for idx, row in df.iterrows():
-        ten_dd = row.iloc[1]
-        ton_that = row.iloc[6]
-        thuong_pham = row.iloc[2]
-        dien_ton_that = row.iloc[5]
+    available_months = sorted({int(fname.split("_")[2].split(".")[0]) for fname in all_files.keys() if "_" in fname})
+    selected_month = st.selectbox("Chọn tháng", available_months)
 
-        data_list.append({
-            "Tháng": month,
-            "Đường dây": ten_dd,
-            "Tổn thất": ton_that,
-            "Thương phẩm": thuong_pham,
-            "Điện tổn thất": dien_ton_that
-        })
+    data_list = []
+    for fname, file_id in all_files.items():
+        month_str = fname.split("_")[2].split(".")[0]
+        try:
+            month = int(month_str)
+        except:
+            continue
 
-df_all = pd.DataFrame(data_list)
+        if month != selected_month:
+            continue
 
-if not df_all.empty:
-    duong_day_list = df_all["Đường dây"].unique()[:4]
-    df_all = df_all[df_all["Đường dây"].isin(duong_day_list)]
+        df = download_excel(file_id)
 
-    if mode == "Lũy kế":
-        df_grouped = df_all.groupby(["Tháng", "Đường dây"], as_index=False).sum()
+        for idx, row in df.iterrows():
+            ten_dd = row.iloc[1]
+            ton_that = row.iloc[6]
+            thuong_pham = row.iloc[2]
+            dien_ton_that = row.iloc[5]
+
+            data_list.append({
+                "Tháng": month,
+                "Đường dây": ten_dd,
+                "Tổn thất": ton_that,
+                "Thương phẩm": thuong_pham,
+                "Điện tổn thất": dien_ton_that
+            })
+
+    df_all = pd.DataFrame(data_list)
+
+    if not df_all.empty:
+        duong_day_list = df_all["Đường dây"].unique()[:4]
+        df_all = df_all[df_all["Đường dây"].isin(duong_day_list)]
+
+        if mode == "Lũy kế":
+            df_grouped = df_all.groupby(["Tháng", "Đường dây"], as_index=False).sum()
+        else:
+            df_grouped = df_all.groupby(["Tháng", "Đường dây"], as_index=False).mean()
+
+        df_grouped = df_grouped.drop_duplicates(subset=["Tháng", "Đường dây"])
+
+        pivot_df = df_grouped.pivot(index="Tháng", columns="Đường dây", values="Tổn thất").fillna(0)
+
+        st.write("### Biểu đồ tổn thất đường dây trong tháng đã chọn")
+
+        fig, ax = plt.subplots(figsize=(8, 4), dpi=150)  # ✅ Co nhỏ khung hình lại để nhìn rõ hơn
+
+        pivot_df.plot(kind="bar", ax=ax)
+        ax.set_xlabel("Tháng")
+        ax.set_ylabel("Tổn thất")
+        ax.set_title(f"Biểu đồ tổn thất - Tháng {selected_month}")
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
+
+        plt.xticks(rotation=0)
+
+        st.pyplot(fig, use_container_width=True)
     else:
-        df_grouped = df_all.groupby(["Tháng", "Đường dây"], as_index=False).mean()
-
-    # Giải quyết trùng lặp trước khi pivot
-    df_grouped = df_grouped.drop_duplicates(subset=["Tháng", "Đường dây"])
-
-    pivot_df = df_grouped.pivot(index="Tháng", columns="Đường dây", values="Tổn thất").fillna(0)
-
-    st.write("### Biểu đồ tổn thất 12 tháng theo từng đường dây")
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-
-    pivot_df.plot(kind="bar", ax=ax)
-    ax.set_xlabel("Tháng")
-    ax.set_ylabel("Tổn thất")
-    ax.set_title("Biểu đồ tổn thất theo đường dây và theo tháng")
-    ax.grid(axis='y', linestyle='--', alpha=0.7)
-
-    plt.xticks(rotation=0)
-
-    st.pyplot(fig)
-else:
-    st.warning("Không có dữ liệu để hiển thị.")
+        st.warning("Không có dữ liệu để hiển thị cho tháng đã chọn.")
