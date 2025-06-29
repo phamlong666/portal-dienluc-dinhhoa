@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import io
 from google.oauth2 import service_account
-from googleapiclient.discovery import build
+from googleapapi.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 st.set_page_config(layout="wide", page_title="Báo cáo tổn thất TBA")
@@ -191,7 +191,8 @@ with st.expander("🔌 Tổn thất các TBA công cộng"):
         pivot_df = pivot_df.reindex(["<2%", ">=2 và <3%", ">=3 và <4%", ">=4 và <5%", ">=5 và <7%", ">=7%"])
 
         # --- Vẽ biểu đồ ---
-        fig, (ax_bar, ax_pie) = plt.subplots(1, 2, figsize=(10, 3), dpi=300)
+        # Increased DPI to 600 for sharpness, adjusted figsize for better presentation
+        fig, (ax_bar, ax_pie) = plt.subplots(1, 2, figsize=(10, 4), dpi=600)
 
         # Biểu đồ cột
         x = range(len(pivot_df))
@@ -203,15 +204,22 @@ with st.expander("🔌 Tổn thất các TBA công cộng"):
             for bar in bars:
                 height = bar.get_height()
                 if height > 0:
-                    ax_bar.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', va='bottom', fontsize=5, fontweight='bold', color='black')
+                    # Adjusted fontsize for bar value labels
+                    ax_bar.text(bar.get_x() + bar.get_width()/2, height + 0.5, f'{int(height)}', ha='center', va='bottom', fontsize=7, fontweight='bold', color='black')
 
-        ax_bar.set_ylabel("Số lượng", fontsize=5)
-        ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
+        # Adjusted fontsize for y-axis label
+        ax_bar.set_ylabel("Số lượng", fontsize=8)
+        # Adjusted fontsize and weight for title
+        ax_bar.set_title("Số lượng TBA theo ngưỡng tổn thất", fontsize=10, weight='bold')
         ax_bar.set_xticks(list(x))
-        ax_bar.set_xticklabels(pivot_df.index, fontsize=5)
-        ax_bar.tick_params(axis='y', labelsize=5)
-        ax_bar.legend(title="Kỳ", fontsize=5)
-        ax_bar.grid(axis='y', linestyle='--', linewidth=0.5)
+        # Adjusted fontsize for x-axis tick labels
+        ax_bar.set_xticklabels(pivot_df.index, fontsize=7)
+        # Adjusted fontsize for y-axis tick labels
+        ax_bar.tick_params(axis='y', labelsize=7)
+        # Adjusted fontsize for legend
+        ax_bar.legend(title="Kỳ", fontsize=7)
+        # Adjusted gridline properties
+        ax_bar.grid(axis='y', linestyle='--', linewidth=0.7, alpha=0.6)
 
         # Biểu đồ tròn (Tỷ trọng) - Ưu tiên dữ liệu 'Thực hiện' hoặc kỳ đầu tiên nếu không có
         pie_data = pd.Series(0, index=pivot_df.index) # Default empty
@@ -236,18 +244,24 @@ with st.expander("🔌 Tổn thất các TBA công cộng"):
             )
 
             for text in texts:
-                text.set_fontsize(4)
+                # Adjusted fontsize for pie chart labels
+                text.set_fontsize(6)
                 text.set_fontweight('bold')
             for autotext in autotexts:
                 autotext.set_color('black')
-                autotext.set_fontsize(4)
+                # Adjusted fontsize for autopct values
+                autotext.set_fontsize(6)
                 autotext.set_fontweight('bold')
 
-            ax_pie.text(0, 0, f"Tổng số TBA\\n{pie_data.sum()}", ha='center', va='center', fontsize=5, fontweight='bold', color='black')
-            ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
+            # Adjusted fontsize for total TBA text
+            ax_pie.text(0, 0, f"Tổng số TBA\\n{pie_data.sum()}", ha='center', va='center', fontsize=7, fontweight='bold', color='black')
+            # Adjusted fontsize and weight for pie chart title
+            ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=10, weight='bold')
         else:
-            ax_pie.text(0.5, 0.5, "Không có dữ liệu tỷ trọng phù hợp", horizontalalignment='center', verticalalignment='center', transform=ax_pie.transAxes, fontsize=6)
-            ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=6, weight='bold')
+            # Adjusted fontsize for no data text
+            ax_pie.text(0.5, 0.5, "Không có dữ liệu tỷ trọng phù hợp", horizontalalignment='center', verticalalignment='center', transform=ax_pie.transAxes, fontsize=8)
+            # Adjusted fontsize and weight for pie chart title
+            ax_pie.set_title("Tỷ trọng TBA theo ngưỡng tổn thất", fontsize=10, weight='bold')
 
 
         st.pyplot(fig)
