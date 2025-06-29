@@ -467,7 +467,6 @@ with st.expander("⚡ Tổn thất trung thế"):
         st.warning("Không có dữ liệu phù hợp để hiển thị.")
 
 st.set_page_config(layout="wide", page_title="Báo cáo tổn thất Đường dây Trung thế")
-st.title("📥 AI_Trợ lý tổn thất")
 
 FOLDER_ID_XT = '1ESynjLXJrw8TaF3zwlQm-BR3mFf4LIi9'
 
@@ -501,10 +500,11 @@ def download_excel(file_id):
 with st.expander("⚡ Tổn thất các đường dây trung thế"):
     st.header("Phân tích dữ liệu tổn thất Đường dây Trung thế")
 
+    all_files_xt = list_excel_files_xt()
+
     nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="xt_nam")
     thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="xt_thang")
 
-    all_files_xt = list_excel_files_xt()
     fname = f"XT_{nam}_{thang:02}.xlsx"
     file_id = all_files_xt.get(fname)
 
@@ -547,3 +547,4 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
             st.warning("Không đủ dữ liệu (phải có ít nhất 4 đường dây).")
     else:
         st.warning(f"Không tìm thấy file: {fname} trên Google Drive.")
+
