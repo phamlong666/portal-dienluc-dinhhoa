@@ -406,7 +406,7 @@ with st.expander("⚡ Tổn thất trung thế (TBA Trung thế)"):
     tong_thuong_pham = 0
 
     for i in range(1, 13):
-        fname = f"TRUNG_{nam}_{i:02}.xlsx"
+        fname = f"TA_{nam}_{i:02}.xlsx"
         file_id = all_files_trung.get(fname)
 
         if file_id and i <= thang:
@@ -427,7 +427,7 @@ with st.expander("⚡ Tổn thất trung thế (TBA Trung thế)"):
                 except:
                     st.warning(f"Lỗi đọc file: {fname}")
 
-        fname_ck = f"TRUNG_{nam - 1}_{i:02}.xlsx"
+        fname_ck = f"TA_{nam - 1}_{i:02}.xlsx"
         file_id_ck = all_files_trung.get(fname_ck)
         if file_id_ck:
             df_ck_file = download_excel(file_id_ck)
