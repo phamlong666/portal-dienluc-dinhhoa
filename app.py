@@ -15,7 +15,7 @@ st.title("📥 AI_Trợ lý tổn thất")
 if 'df_tba_thang' not in st.session_state:
     st.session_state.df_tba_thang = None
 if 'df_tba_luyke' not in st.session_state:
-    st.session_session.df_tba_luyke = None
+    st.session_state.df_tba_luyke = None # Corrected: Changed session_session to session_state
 if 'df_tba_ck' not in st.session_state:
     st.session_state.df_tba_ck = None
 if 'df_ha_thang' not in st.session_state:
@@ -560,7 +560,7 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
 
             if chart_type == "Cột":
                 pivot_df.plot(kind="bar", ax=ax)
-                ax.set_xticklabels(pivot_df.index, rotation=0, ha='center') # Changed rotation to 0
+                ax.set_xticklabels(pivot_df.index, rotation=0, ha='center') # Changed rotation to 0, ha='center'
                 ax.tick_params(axis='y', labelrotation=0) # Ensure y-axis labels are not rotated
                 for container in ax.containers:
                     for bar in container:
@@ -574,7 +574,7 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
                     for x, y in zip(valid_data.index, valid_data.values):
                         ax.text(x, y + 0.2, f"{y:.2f}", ha='center', fontsize=7)
                 ax.set_xticks(range(1, 13))
-                ax.set_xticklabels(range(1, 13), rotation=0, ha='center') # Changed rotation to 0 and added ha='center'
+                ax.set_xticklabels(range(1, 13), rotation=0, ha='center') # Changed rotation to 0, ha='center'
                 ax.tick_params(axis='y', labelrotation=0) # Ensure y-axis labels are not rotated
 
             ax.set_xlabel("Tháng")
