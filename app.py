@@ -289,7 +289,7 @@ with st.expander("⚡ Tổn thất hạ thế"):
     nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="ha_nam")
     thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="ha_thang")
 
-    df_list = []
+    df_list_th = []
     df_list_ck = []
     df_list_kh = []
 
@@ -303,21 +303,21 @@ with st.expander("⚡ Tổn thất hạ thế"):
             df = download_excel(file_id)
             if not df.empty and df.shape[0] >= 1:
                 try:
-                    ty_le_th = float(str(df.iloc[0, 4]).replace(",", "."))  # Thực hiện (cột E)
-                    ty_le_ck = float(str(df.iloc[0, 5]).replace(",", ".")) if df.shape[1] >= 6 else None  # Cùng kỳ (cột F nếu có)
-                    ty_le_kh = float(str(df.iloc[0, 6]).replace(",", ".")) if df.shape[1] >= 7 else None  # Kế hoạch (cột G nếu có)
+                    ty_le_th = float(str(df.iloc[0, 4]).replace(",", "."))  # cột E
+                    ty_le_ck = float(str(df.iloc[0, 5]).replace(",", ".")) if df.shape[1] >= 6 else None
+                    ty_le_kh = float(str(df.iloc[0, 6]).replace(",", ".")) if df.shape[1] >= 7 else None
 
-                    df_list.append({"Tháng": i, "Tỷ lệ": ty_le_th})
+                    df_list_th.append({"Tháng": i, "Tỷ lệ": ty_le_th})
                     if ty_le_ck is not None:
                         df_list_ck.append({"Tháng": i, "Tỷ lệ": ty_le_ck})
                     if ty_le_kh is not None:
                         df_list_kh.append({"Tháng": i, "Tỷ lệ": ty_le_kh})
                 except:
-                    st.warning(f"Lỗi đọc dữ liệu file: {fname}")
+                    st.warning(f"Lỗi đọc file: {fname}")
 
-    df_th = pd.DataFrame(df_list).sort_values("Tháng")
-    df_ck = pd.DataFrame(df_list_ck).sort_values("Tháng") if df_list_ck else pd.DataFrame()
-    df_kh = pd.DataFrame(df_list_kh).sort_values("Tháng") if df_list_kh else pd.DataFrame()
+    df_th = pd.DataFrame(df_list_th)
+    df_ck = pd.DataFrame(df_list_ck)
+    df_kh = pd.DataFrame(df_list_kh)
 
     if not df_th.empty:
         fig, ax = plt.subplots(figsize=(6, 3), dpi=150)
