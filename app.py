@@ -499,13 +499,16 @@ st.title("⚡ Tổn thất các đường dây trung thế")
 
 all_files = list_excel_files()
 
-# ✅ Chọn chế độ: Tháng hoặc Lũy kế
 mode = st.radio("Chọn chế độ báo cáo", ["Tháng", "Lũy kế"], horizontal=True)
 
-# Đọc toàn bộ file tự động
 data_list = []
 for fname, file_id in all_files.items():
     df = download_excel(file_id)
+    month_str = fname.split("_")[2].split(".")[0]
+    try:
+        month = int(month_str)
+    except:
+        continue
 
     for idx, row in df.iterrows():
         ten_dd = row.iloc[1]
@@ -514,7 +517,7 @@ for fname, file_id in all_files.items():
         dien_ton_that = row.iloc[5]
 
         data_list.append({
-            "Tháng": int(fname.split("_")[2].split(".")[0]),
+            "Tháng": month,
             "Đường dây": ten_dd,
             "Tổn thất": ton_that,
             "Thương phẩm": thuong_pham,
@@ -524,14 +527,16 @@ for fname, file_id in all_files.items():
 df_all = pd.DataFrame(data_list)
 
 if not df_all.empty:
-    # Lọc chỉ 4 đường dây đang có dữ liệu
     duong_day_list = df_all["Đường dây"].unique()[:4]
     df_all = df_all[df_all["Đường dây"].isin(duong_day_list)]
 
     if mode == "Lũy kế":
-        df_grouped = df_all.groupby(["Tháng", "Đường dây"]).sum().reset_index()
+        df_grouped = df_all.groupby(["Tháng", "Đường dây"], as_index=False).sum()
     else:
-        df_grouped = df_all.copy()
+        df_grouped = df_all.groupby(["Tháng", "Đường dây"], as_index=False).mean()
+
+    # Giải quyết trùng lặp trước khi pivot
+    df_grouped = df_grouped.drop_duplicates(subset=["Tháng", "Đường dây"])
 
     pivot_df = df_grouped.pivot(index="Tháng", columns="Đường dây", values="Tổn thất").fillna(0)
 
@@ -550,4 +555,3 @@ if not df_all.empty:
     st.pyplot(fig)
 else:
     st.warning("Không có dữ liệu để hiển thị.")
-
