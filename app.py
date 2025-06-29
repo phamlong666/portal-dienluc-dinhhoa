@@ -494,53 +494,52 @@ def download_excel(file_id):
     fh.seek(0)
     return pd.read_excel(fh, sheet_name=0)
 
-st.set_page_config(layout="wide", page_title="Báo cáo tổn thất Đường dây Trung thế")
-st.title("⚡ Tổn thất các đường dây trung thế")
+with st.expander("⚡ Tổn thất các đường dây trung thế"):
+    st.header("Phân tích dữ liệu tổn thất Đường dây Trung thế")
 
-all_files = list_excel_files()
-file_names = list(all_files.keys())
+    all_files = list_excel_files()
+    file_names = list(all_files.keys())
 
-# ✅ Mặc định chọn tất cả file
-selected_files = st.multiselect("Chọn file từ Google Drive", file_names, default=file_names)
+    selected_files = st.multiselect("Chọn file từ Google Drive", file_names)
 
-if selected_files:
-    data_list = []
-    for fname in selected_files:
-        file_id = all_files[fname]
-        df = download_excel(file_id)
+    if selected_files:
+        data_list = []
+        for fname in selected_files:
+            file_id = all_files[fname]
+            df = download_excel(file_id)
 
-        ten_dd = df.iloc[0, 1]
-        ton_that = df.iloc[0, 6]
-        thuong_pham = df.iloc[0, 2]
-        dien_ton_that = df.iloc[0, 5]
+            ten_dd = df.iloc[0, 1]
+            ton_that = df.iloc[0, 6]
+            thuong_pham = df.iloc[0, 2]
+            dien_ton_that = df.iloc[0, 5]
 
-        data_list.append({
-            "Đường dây": ten_dd,
-            "Tổn thất": ton_that,
-            "Thương phẩm": thuong_pham,
-            "Điện tổn thất": dien_ton_that
-        })
+            data_list.append({
+                "Đường dây": ten_dd,
+                "Tổn thất": ton_that,
+                "Thương phẩm": thuong_pham,
+                "Điện tổn thất": dien_ton_that
+            })
 
-    df_all = pd.DataFrame(data_list)
+        df_all = pd.DataFrame(data_list)
 
-    tong_dien_ton_that = df_all["Điện tổn thất"].sum()
-    tong_thuong_pham = df_all["Thương phẩm"].sum()
-    ty_le_luy_ke = (tong_dien_ton_that / tong_thuong_pham) * 100 if tong_thuong_pham > 0 else 0
+        tong_dien_ton_that = df_all["Điện tổn thất"].sum()
+        tong_thuong_pham = df_all["Thương phẩm"].sum()
+        ty_le_luy_ke = (tong_dien_ton_that / tong_thuong_pham) * 100 if tong_thuong_pham > 0 else 0
 
-    st.write("### Bảng dữ liệu tổng hợp")
-    st.dataframe(df_all, use_container_width=True)
+        st.write("### Bảng dữ liệu tổng hợp")
+        st.dataframe(df_all, use_container_width=True)
 
-    st.write(f"**Tỷ lệ lũy kế (theo công thức): {ty_le_luy_ke:.2f}%**")
+        st.write(f"**Tỷ lệ lũy kế (theo công thức): {ty_le_luy_ke:.2f}%**")
 
-    fig, ax = plt.subplots(figsize=(8, 4), dpi=200)
-    ax.bar(df_all["Đường dây"], df_all["Tổn thất"], color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
-    ax.set_ylabel("Tổn thất")
-    ax.set_title("Biểu đồ tổn thất theo từng đường dây")
-    ax.grid(axis='y', linestyle='--', alpha=0.7)
+        fig, ax = plt.subplots(figsize=(8, 4), dpi=200)
+        ax.bar(df_all["Đường dây"], df_all["Tổn thất"], color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
+        ax.set_ylabel("Tổn thất")
+        ax.set_title("Biểu đồ tổn thất theo từng đường dây")
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
 
-    for i, v in enumerate(df_all["Tổn thất"]):
-        ax.text(i, v + 0.5, f"{v:.2f}", ha='center', fontsize=8)
+        for i, v in enumerate(df_all["Tổn thất"]):
+            ax.text(i, v + 0.5, f"{v:.2f}", ha='center', fontsize=8)
 
-    st.pyplot(fig)
-else:
-    st.info("Vui lòng chọn file từ Google Drive để hiển thị dữ liệu.")
+        st.pyplot(fig)
+    else:
+        st.info("Vui lòng chọn file từ Google Drive để hiển thị dữ liệu.")
