@@ -8,11 +8,48 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
-# --- Các expander gốc giữ nguyên ---
+# --- Các đoạn code và expander gốc ---
+# (Đưa đầy đủ code gốc của anh vào đây, không chỉ placeholder)
+
+# --- Bổ sung đầy đủ hàm get_drive_service để tránh lỗi NameError ---
+FOLDER_ID = '165Txi8IyqG50uFSFHzWidSZSG9qpsbaq'
+
+@st.cache_data
+def get_drive_service():
+    try:
+        credentials = service_account.Credentials.from_service_account_info(
+            st.secrets["google"],
+            scopes=["https://www.googleapis.com/auth/drive.readonly"]
+        )
+        return build('drive', 'v3', credentials=credentials)
+    except Exception as e:
+        st.error(f"Lỗi khi xác thực Google Drive: {e}.")
+        return None
+
+@st.cache_data
+def download_excel(file_id):
+    service = get_drive_service()
+    if not service:
+        return pd.DataFrame()
+    try:
+        request = service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+        fh.seek(0)
+        return pd.read_excel(fh, sheet_name="dữ liệu")
+    except Exception as e:
+        st.warning(f"Không thể tải hoặc đọc file: {e}.")
+        return pd.DataFrame()
+
+# --- 🔌 Tổn thất các TBA công cộng ---
 with st.expander("🔌 Tổn thất các TBA công cộng"):
     st.header("Phân tích dữ liệu TBA công cộng")
-    st.info("Giữ nguyên toàn bộ code gốc TBA công cộng ở đây.")
+    # Đưa nguyên code gốc TBA công cộng của anh đã test chạy tốt vào đây
 
+# --- ⚡ Tổn thất hạ thế ---
 with st.expander("⚡ Tổn thất hạ thế"):
     st.header("Phân tích dữ liệu tổn thất hạ thế")
 
@@ -79,14 +116,17 @@ with st.expander("⚡ Tổn thất hạ thế"):
     else:
         st.warning("Chưa chọn file dữ liệu.")
 
-with st.expander("⚡ Tổn thất trung thế"):
-    st.header("Phân tích dữ liệu tổn thất trung thế)")
-    st.info("Giữ nguyên toàn bộ code gốc trung thế ở đây.")
+# --- ⚡ Tổn thất trung thế (TBA Trung thế) ---
+with st.expander("⚡ Tổn thất trung thế (TBA Trung thế)"):
+    st.header("Phân tích dữ liệu TBA Trung áp (Trung thế)")
+    # Đưa nguyên code gốc TBA Trung thế của anh vào đây
 
+# --- ⚡ Tổn thất các đường dây trung thế ---
 with st.expander("⚡ Tổn thất các đường dây trung thế"):
     st.header("Phân tích dữ liệu tổn thất Đường dây Trung thế")
-    st.info("Giữ nguyên toàn bộ code gốc đường dây ở đây.")
+    # Đưa nguyên code gốc Đường dây trung thế của anh vào đây
 
+# --- 🏢 Tổn thất toàn đơn vị ---
 with st.expander("🏢 Tổn thất toàn đơn vị"):
     st.header("Phân tích dữ liệu tổn thất Toàn đơn vị")
-    st.info("Giữ nguyên toàn bộ code gốc toàn đơn vị ở đây.")
+    # Đưa nguyên code gốc toàn đơn vị của anh vào đây
