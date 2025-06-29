@@ -266,6 +266,7 @@ with st.expander("🔌 Tổn thất các TBA công cộng"):
         st.warning("Không có dữ liệu phù hợp để hiển thị biểu đồ. Vui lòng kiểm tra các file Excel trên Google Drive và định dạng của chúng (cần cột 'Tỷ lệ tổn thất').")
 
 
+
 with st.expander("⚡ Tổn thất hạ thế"):
     st.header("Phân tích dữ liệu tổn thất hạ thế")
 
@@ -286,9 +287,9 @@ with st.expander("⚡ Tổn thất hạ thế"):
 
     all_files_ha = list_excel_files_ha()
     nam = st.selectbox("Chọn năm", list(range(2020, datetime.now().year + 1))[::-1], index=0, key="ha_nam")
-    loai_bc = st.radio("Loại báo cáo", ["Tháng", "Lũy kế"], index=0, key="ha_loai_bc")
     thang = st.selectbox("Chọn tháng", list(range(1, 13)), index=0, key="ha_thang")
 
+    # Thực hiện
     df_list = []
     for fname in all_files_ha:
         if f"HA_{nam}_" in fname:
@@ -298,39 +299,50 @@ with st.expander("⚡ Tổn thất hạ thế"):
                     file_id = all_files_ha.get(fname)
                     df = download_excel(file_id)
                     if not df.empty and df.shape[0] >= 1:
-                        ty_le = float(str(df.iloc[0, 4]).replace(",", "."))  # Cột E
-                        ton_that = float(str(df.iloc[0, 3]).replace(",", "."))  # Cột D
-                        thuong_pham = float(str(df.iloc[0, 1]).replace(",", "."))  # Cột B
-                        df_list.append({"Tháng": month, "Tỷ lệ": ty_le, "Tổn thất": ton_that, "Thương phẩm": thuong_pham})
+                        ty_le = float(str(df.iloc[0, 4]).replace(",", "."))
+                        df_list.append({"Tháng": month, "Tỷ lệ": ty_le})
             except:
                 st.warning(f"Lỗi đọc file: {fname}")
 
-    df_final = pd.DataFrame(df_list)
-    df_final = df_final.sort_values("Tháng") if not df_final.empty and "Tháng" in df_final.columns else df_final
+    df_th = pd.DataFrame(df_list).sort_values("Tháng")
 
-    if not df_final.empty:
-        if loai_bc == "Lũy kế":
-            tong_ton_that = df_final["Tổn thất"].sum()
-            tong_thuong_pham = df_final["Thương phẩm"].sum()
-            ty_le_luyke = (tong_ton_that / tong_thuong_pham) * 100 if tong_thuong_pham > 0 else 0
-            df_final = pd.DataFrame({"Tháng": [f"Lũy kế đến T{thang}"], "Tỷ lệ": [ty_le_luyke]})
-        else:
-            df_final = df_final[df_final["Tháng"] == thang]
+    # Cùng kỳ
+    nam_ck = nam - 1
+    df_list_ck = []
+    for fname in all_files_ha:
+        if f"HA_{nam_ck}_" in fname:
+            try:
+                month = int(fname.split("_")[2].split(".")[0])
+                if month <= thang:
+                    file_id = all_files_ha.get(fname)
+                    df = download_excel(file_id)
+                    if not df.empty and df.shape[0] >= 1:
+                        ty_le = float(str(df.iloc[0, 4]).replace(",", "."))
+                        df_list_ck.append({"Tháng": month, "Tỷ lệ": ty_le})
+            except:
+                pass
 
-        fig, ax = plt.subplots(figsize=(6, 3), dpi=150)
-        ax.plot(df_final["Tháng"], df_final["Tỷ lệ"], marker='o', color='black', linewidth=1)
+    df_ck = pd.DataFrame(df_list_ck).sort_values("Tháng")
 
-        for i, v in enumerate(df_final["Tỷ lệ"]):
-            ax.text(df_final["Tháng"].iloc[i], v + 0.05, f"{v:.2f}", ha='center', fontsize=6, color='black')
+    if not df_th.empty:
+        fig, ax = plt.subplots(figsize=(3, 1.5), dpi=150)
+
+        ax.plot(df_th["Tháng"], df_th["Tỷ lệ"], marker='o', color='black', label='Thực hiện', linewidth=1)
+        if not df_ck.empty:
+            ax.plot(df_ck["Tháng"], df_ck["Tỷ lệ"], marker='o', color='orange', label='Cùng kỳ', linewidth=1)
+
+        for i, v in enumerate(df_th["Tỷ lệ"]):
+            ax.text(df_th["Tháng"].iloc[i], v + 0.05, f"{v:.2f}", ha='center', fontsize=6, color='black')
 
         ax.set_ylabel("Tỷ lệ (%)", fontsize=8, color='black')
         ax.set_xlabel("Tháng", fontsize=8, color='black')
         ax.tick_params(axis='both', colors='black', labelsize=6)
         ax.grid(True, linestyle='--', linewidth=0.5)
         ax.set_title("Biểu đồ tỷ lệ tổn thất hạ thế", fontsize=9, color='black')
+        ax.legend(fontsize=6)
 
         st.pyplot(fig)
-        st.dataframe(df_final)
+        st.dataframe(df_th)
 
     else:
         st.warning("Không có dữ liệu phù hợp để hiển thị.")
