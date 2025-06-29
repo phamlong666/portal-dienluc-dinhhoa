@@ -502,8 +502,8 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
     all_files = list_excel_files()
 
     all_years = sorted({int(fname.split("_")[1]) for fname in all_files.keys() if "_" in fname})
-    selected_year = st.selectbox("Chọn năm", all_years)
 
+    selected_year = st.selectbox("Chọn năm", all_years)
     include_cungkỳ = st.checkbox("So sánh cùng kỳ năm trước", value=True)
     mode = st.radio("Chọn chế độ báo cáo", ["Tháng", "Lũy kế"], horizontal=True)
     chart_type = st.radio("Chọn kiểu biểu đồ", ["Cột", "Đường line"], horizontal=True)
@@ -552,7 +552,7 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
             else:
                 df_dd["Tổn thất (%)"] = (df_dd["Điện tổn thất"] / df_dd["Thương phẩm"] * 100).round(2)
 
-            pivot_df = df_dd.pivot(index="Tháng", columns="Kỳ", values="Tổn thất (%)")
+            pivot_df = df_dd.pivot(index="Tháng", columns="Kỳ", values="Tổn thất (%)").reindex(range(1, 13)).fillna(0)
 
             st.write(f"### Biểu đồ tỷ lệ tổn thất - Đường dây {dd}")
 
@@ -560,7 +560,6 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
 
             if chart_type == "Cột":
                 pivot_df.plot(kind="bar", ax=ax)
-                ax.set_xticks(pivot_df.index)
                 ax.set_xticklabels(pivot_df.index, rotation=90, ha='center')
                 for container in ax.containers:
                     for bar in container:
@@ -569,13 +568,13 @@ with st.expander("⚡ Tổn thất các đường dây trung thế"):
                             ax.text(bar.get_x() + bar.get_width()/2, height + 0.2, f"{height:.2f}", ha='center', fontsize=7)
             else:
                 for col in pivot_df.columns:
-                    valid_data = pivot_df[col][pivot_df[col] > 0]
+                    valid_data = pivot_df[col]
                     ax.plot(valid_data.index, valid_data.values, marker='o', label=col)
                     for x, y in zip(valid_data.index, valid_data.values):
                         if y > 0:
                             ax.text(x, y + 0.2, f"{y:.2f}", ha='center', fontsize=7)
-                ax.set_xticks(valid_data.index)
-                ax.set_xticklabels(valid_data.index, rotation=90, ha='center')
+                ax.set_xticks(range(1, 13))
+                ax.set_xticklabels(range(1, 13), rotation=90)
 
             ax.set_xlabel("Tháng")
             ax.set_ylabel("Tổn thất (%)")
